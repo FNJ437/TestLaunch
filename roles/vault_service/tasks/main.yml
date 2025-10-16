@@ -1,0 +1,68 @@
+#
+## Copyright Motorola Solutions, Inc. and/or Kodiak Networks, Inc.
+## All Rights Reserved
+## Motorola Solutions Confidential Restricted
+##
+#- name: client configurations
+#  block:
+#    - name: create hsm logs dir
+#      command: docker exec {{CONTAINERNAME}} bash -c 'mkdir -p /DGlogs/halog && chmod 0755 /DGlogs/halog && chown -R root:kodiakgroup /DGlogs/halog'
+
+#    - name: check Client Tar exits
+#      stat:
+#        path: "{{ClientTar}}"
+#      delegate_to: 127.0.0.1
+#      register: tar_status
+
+#    - fail:
+#        msg: 'Container configuration failed'
+#      when: tar_status.stat.exists == false
+
+
+#    - name: copy {{ClientTar}} to DGdata
+#      copy:
+#        src: "{{ClientTar}}"
+#        dest: "/DGdata/{{CONTAINER_COPY_PATH}}/DGdata"
+#        owner: root
+#        group: kodiakgroup
+#        mode: 0755
+#        force: yes
+
+#    - name: extract client libraries
+#      command: docker exec {{CONTAINERNAME}} bash -c 'tar -xzf /DGdata/{{ClientTar}} -C / && rm -f /DGdata/{{ClientTar}}'
+
+#  when: UNSEAL_METHOD == 2
+
+#- name: Executing vault service script
+#  command: docker exec {{CONTAINERNAME}} bash -c 'sh /DG/activeRelease/Tools/vaultservice.sh "{{INIFILEPATH}}/{{INIFILE}}"'
+
+- name: fetch instance number
+  command: docker exec {{CONTAINERNAME}} sh -c 'grep -i "^INSTANCE_NUM=" "{{INIFILEPATH}}/{{INIFILE}}" |cut -d"=" -f2'
+  register: cont_instance
+
+- debug: msg="vault instance number {{cont_instance.stdout}}"
+
+- name: export vault roles and polices
+  block:
+    - name: waiting until existing process exits
+      command: docker exec {{EMSCONTAINERNAME}} bash -c "ps -aef|grep -i vaultpoliciesexport.sh|grep -v grep|wc -l"
+      register: process_cnt
+      ignore_errors: true
+      until: process_cnt.stdout == '0'
+      delay: 3
+      retries: 20
+
+    - name: execute vaultpoliciesexport.sh
+      command: docker exec {{EMSCONTAINERNAME}} bash -c 'sh /DG/activeRelease/Tools/CronJobs/vaultpoliciesexport.sh 1'
+      register: export_status
+
+    - name: fail when export fails
+      fail:
+         msg: failed to export vault roles and policies
+      when: export_status.rc != 0
+  delegate_to: "{{EMSHOSTIP}}"
+  when: cont_instance.stdout == '1'
+
+#- name: stop sshd service and disable it
+#  command: docker exec {{CONTAINERNAME}} bash -c 'systemctl stop sshd && systemctl disable sshd'
+

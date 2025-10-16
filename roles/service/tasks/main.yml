@@ -1,0 +1,43 @@
+#
+## Copyright Motorola Solutions, Inc. and/or Kodiak Networks, Inc.
+## All Rights Reserved
+## Motorola Solutions Confidential Restricted
+##
+- block:
+    - name: Executing CopyK8ConfFiles script
+      shell: sh /DG/activeRelease/Tools/CopyK8ConfFiles.sh {{ CONTAINERIP }}
+      register: copyK8_res
+      ignore_errors: true
+      delegate_to: 127.0.0.1
+
+    - debug: var=copyK8_res
+      when: copyK8_res is defined
+
+    - fail: msg="Container configuration failed"
+      failed_when:
+        - copyK8_res.rc != 0
+        - copyK8_res.failed == true
+  when: DEPLOYMENT_PLATFORM_TYPE == 4
+
+- import_role:
+    name: configipa
+  become: yes
+  become_method: sudo
+  when: RHELIDM_INSTALLED_FLAG != 0
+
+- name: Executing rmq Congfiguration script in EMS
+  command: sh "{{ RMQCONFIG_SCRIPT }}" SIGID:"{{ SIGCARDID }}"
+  register: rmq_status
+  ignore_errors: true
+  when: SERVERTYPE == 'RabbitMQ'
+  delegate_to: 127.0.0.1
+
+- debug: var=rmq_status
+  when:
+    - SERVERTYPE == 'RabbitMQ'
+    - rmq_status is defined
+
+- fail: msg="Container configuration failed"
+  when:
+    - SERVERTYPE == 'RabbitMQ'
+    - rmq_status.rc != 0
