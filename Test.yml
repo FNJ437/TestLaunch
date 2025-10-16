@@ -6,18 +6,12 @@
   tasks:
       - name: Create a directory if it does not exist
         ansible.builtin.file:
-          path: /home/autoinstall/devdas
+          path: /home/autoinstall/radha
           state: directory
           mode: '0775'
 
-      - name: Touch the same file, but add/remove some permissions
-        ansible.builtin.file:
-          path: /home/autoinstall/devdas/aap_test.txt
-          state: touch
-          mode: 775
-
-      - name: add some contents in the file
+      - name: Create a file
         lineinfile:
-          path: /home/autoinstall/devdas/aap_test.txt
+          path: /home/autoinstall/radha/aap_test.txt
           line: Hi this is a test file genertaed for AAAP demo
           create: yes
