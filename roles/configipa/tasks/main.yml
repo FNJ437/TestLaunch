@@ -1,0 +1,45 @@
+#
+## Copyright Motorola Solutions, Inc. and/or Kodiak Networks, Inc.
+## All Rights Reserved
+## Motorola Solutions Confidential Restricted
+##
+#- name: copy ipa-config to VM
+#  copy:
+#    src: "{{IPACONFIG_SCRIPT}}"
+#    dest: "/DGdata/{{CONTAINER_COPY_PATH}}/DGdata"
+#    owner: root
+#    group: kodiakgroup
+#    mode: 0755
+#    force: yes
+
+#- name: copy ipa-config from VM to remote
+#  command: docker exec {{CONTAINERNAME}} cp /DGdata/{{ IPACONFIG_SCRIPT | basename }} {{IPADEST_PATH}}
+
+#- name: execute ipa-config
+#  command: docker exec {{CONTAINERNAME}} bash -c "{{IPADEST_PATH}}/{{IPACONFIG_SCRIPT | basename}} config {{INIFILEPATH}}/{{INIFILE}}"
+#  register: ipa_result
+#  async: 3600
+#  poll: 10
+#  ignore_errors: true
+#  become: yes
+#  become_method: sudo
+
+#- name: Verify idm integration
+#  command: docker exec {{CONTAINERNAME}} bash -c  '"{{IPADEST_PATH}}/{{IPACONFIG_SCRIPT | basename}}" verify'
+#  register: verify_idm_integration
+
+#- debug: var=verify_idm_integration
+
+#- fail: msg="Container configuration failed"
+#  when: verify_idm_integration.rc != 0
+
+- name: copy pam_sss file in client
+  copy:
+    src: password-auth
+    dest: "{{COPYTEMP_PATH}}"
+    owner: root
+    group: root
+    mode: 644
+  register: pam_copy
+#  when:
+#    - verify_idm_integration.rc == 0
