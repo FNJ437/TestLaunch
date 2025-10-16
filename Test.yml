@@ -1,17 +1,11 @@
----
-- name: Test create a file and data to it
-  hosts: all
-  gather_facts: yes
+- name: Create a directory
+  file:
+    path: /home/autoinstall/radha
+    state: directory
+    mode: '0755'
 
-  tasks:
-      - name: Create a directory if it does not exist
-        ansible.builtin.file:
-          path: /home/autoinstall/radha
-          state: directory
-          mode: '0775'
-
-      - name: Create a file
-        lineinfile:
-          path: /home/autoinstall/radha/aap_test.txt
-          line: Hi this is a test file genertaed for AAAP demo
-          create: yes
+- name: Create a file inside the directory
+  copy:
+    dest: /home/autoinstall/radha/testfile.txt
+    content: "This is a sample test file."
+    mode: '0644'
