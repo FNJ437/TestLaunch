@@ -1,0 +1,95 @@
+#
+## Copyright Motorola Solutions, Inc. and/or Kodiak Networks, Inc.
+## All Rights Reserved
+## Motorola Solutions Confidential Restricted
+##
+- hosts: HOSTS
+  gather_facts: False
+  strategy: free
+
+  tasks:
+    - name: Copy the template to VM
+      copy:
+        src: "{{item}}"
+        dest: /home/autoinstall/temp/
+        owner: "{{ansible_ssh_user}}"
+        group: kodiakgroup
+      with_items:
+        - /DG/activeRelease/container/conf/{{INIFILE}}
+        - /DG/activeRelease/container/conf/{{ OPTIONSFILE }}
+
+    - block:
+        - name: Check if EMS container exists
+          shell: docker ps | grep -i {{ item.1 }} | awk -F ' ' '{print $NF}'
+          delegate_to: "{{ item.0 }}"
+          register: ems_cont
+          loop: "{{ EMSHOSTIPLIST | product(EMSCONTAILNERNAMELIST) | list }}"
+          ignore_errors: yes
+          become: yes
+          become_method: sudo
+
+        - set_fact:
+            EMSCONTNAMELIST: "{{ ems_cont.results }}"
+
+        - name: Check the file existence
+          ansible.builtin.shell: |
+            docker exec {{ item.item.1 }}  test -f /root/.ssh/id_dsa.pub && echo "File exists" || echo "File does not exist"
+          register: file_stat
+          become: yes
+          become_method: sudo
+          delegate_to: "{{item.item.0}}"
+          loop: "{{ ems_cont.results }}"
+          when: item.stdout is not none and item.stdout | trim | length > 0
+          changed_when: false
+
+        - name: Create a 1024-bit SSH key for user root /root/.ssh/id_dsa
+          ansible.builtin.shell: |
+            docker exec {{ item.item.item.1 }}  bash -c 'sudo ssh-keygen -t dsa -b 1024 -f /root/.ssh/id_dsa -N ""'
+          become: yes
+          become_method: sudo
+          run_once: true
+          delegate_to: "{{item.item.item.0}}"
+          with_items: "{{ file_stat.results }}"
+          when: item.stdout is defined and item.stdout == 'File does not exist'
+      when: ENABLE_PASSWORDLESS == 1
+
+    - name: client configurations
+      block:
+        - name: check Client Tar exits
+          stat:
+            path: "{{ClientTar}}"
+          delegate_to: 127.0.0.1
+          register: tar_status
+
+        - fail:
+            msg: 'Container configuration failed'
+          when: tar_status.stat.exists == false
+
+        - name: copy {{ClientTar}} to DGdata
+          copy:
+            src: "{{ClientTar}}"
+            dest: "/DGdata/Software"
+            owner: root
+            group: kodiakgroup
+            mode: 0755
+            force: yes
+      when:
+        - SERVERTYPE == 'VAULT'
+        - UNSEAL_METHOD == 2
+
+    - name: Copying BCTONES Dir to VM
+      copy:
+        src: /DG/activeRelease/BCTONES
+        dest: "/DGdata/Software/"
+        directory_mode: yes
+      become: yes
+      become_method: sudo
+      ignore_errors: true
+      when:
+        - SERVERTYPE == 'Media'
+
+    - name: Executing container creation role
+      import_role:
+         name: create
+      become: yes
+      become_method: sudo

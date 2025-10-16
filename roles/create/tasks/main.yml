@@ -1,0 +1,266 @@
+- name: Calculate Memory
+  lineinfile: dest=/home/autoinstall/temp/{{INIFILE}} state=present regexp='MEMORY_LIMIT*' line='MEMORY_LIMIT={{MEM_LIMIT}}m' backrefs=yes
+
+- name: Executing Container Launch Execution
+  shell: "{{ CREATECOMMAND }} /home/autoinstall/temp/{{INIFILE}}"
+  register: shell_result
+  ignore_errors: True
+
+- debug: var=shell_result
+
+- name: Starting container systemd service
+  systemd:
+    state: started
+    name: "{{ CONTAINERNAME }}"
+  ignore_errors: true
+
+- name: Validate container launch script execution status
+  fail: msg="Required conditions to trigger container launch are not satisfied"
+  when: shell_result.failed is defined and shell_result.failed == true
+
+- name: Check if the container launch script satisfies the preconditions
+  fail: msg="Required conditions to trigger container launch are not satisfied"
+  when: "'command not found' in shell_result.stderr"
+
+- name: Check if docker binary is installed on the machine
+  fail: msg="Docker is not installed on the host machine"
+  when: "'docker binary </bin/docker> not installed' in shell_result.stdout"
+
+- name: Name is already assigned to other Instance
+  fail: msg="Another instance is running with the same name"
+  when: " 'is already assigned to' in shell_result.stderr"
+
+- name: DOcker daemon is not running
+  fail: msg="DOcker daemon is not running"
+  when: "'Cannot connect to the Docker daemon' in shell_result.stderr"
+
+- name: Image is not found
+  fail: msg="Image provided is not found"
+  when: "'[ERROR> - docker image' in shell_result.stdout"
+
+- name: Container status
+  fail: msg="Container is not running"
+  when: "'[ERROR> - Unable to start container' in shell_result.stdout"
+
+- name: Container status
+  fail: msg="Container is not running"
+  when: "'[ERROR> - unable to create container' in shell_result.stdout"
+
+- name: removing any extra INI file
+  command: rm -f /DGdata/{{ CONTAINER_COPY_PATH }}/DGdata/*.properties
+  ignore_errors: true
+
+- name: copy ipa-config to container
+  copy:
+    src: "{{IPACONFIG_SCRIPT}}"
+    dest: "{{COPYTEMP_PATH}}"
+    owner: root
+    group: kodiakgroup
+    mode: 0755
+    force: yes
+
+- name: copy of RHELIDM clientbackup
+  copy:
+    src: "{{ item }}"
+    dest: "/DGdata/{{CONTAINER_COPY_PATH}}/DGdata"
+    force: yes
+    owner: root
+    group: kodiakgroup
+    mode: 0777
+  become: yes
+  become_method: sudo
+  with_fileglob: "{{ CLIENT_BACKUP }}"
+  ignore_errors: true
+  register: ipa_backup
+
+- debug: var=ipa_backup
+
+- name: Copy the inifile to the Container
+  copy:
+    src: /DG/activeRelease/container/conf/{{INIFILE}}
+    dest: /DGdata/{{CONTAINER_COPY_PATH}}/DGdata/
+  when: ENABLE_PASSWORDLESS == 0
+
+- name: Copy the inifile to the Container
+  command: docker cp /home/autoinstall/temp/{{INIFILE}} {{ CONTAINERNAME }}:/home/autoinstall/
+  when: ENABLE_PASSWORDLESS == 1
+
+- name: Check the Container state
+  shell: /usr/sbin/service "{{ shell_result.stdout_lines[4].split(':')[1].strip() }}" status
+  register: service_result
+  until: "'active (running)' in service_result.stdout"
+  retries: 6
+  delay: 10
+  ignore_errors: True
+- debug: var=service_result
+
+- name: service failure
+  fail: msg="Container has failed to comeup"
+  when: "'active (running)' not in service_result.stdout"
+
+- name: Container launch success
+  debug: msg="Container Created Successfully on VM"
+  when: "'active (running)' in service_result.stdout"
+
+- name: Check /opt/TimesTen/kodiak/info/wallets exists in local EMS
+  stat:
+    path: /opt/TimesTen/kodiak/info/wallets/
+  register: walletdir
+  delegate_to: localhost
+
+- debug:
+    msg: "/opt/TimesTen/kodiak/info/wallets directory doesnot exists in local EMS"
+  when: walletdir.stat.exists == false
+
+- name: Copy TimesTen info folder
+  copy:
+    src: /opt/TimesTen/kodiak/info/wallets
+    dest: "{{COPYTEMP_PATH}}"
+    owner: root
+    group: kodiakgroup
+    mode: 0755
+    force: yes
+  when: walletdir.stat.exists == true
+
+- block:
+    - name: Wait for SSH to come up
+      wait_for:
+        port: 22
+        host: "{{ CONTAINERIP }}"
+        delay: 10
+        connect_timeout: 5
+        sleep: 1
+        timeout: 60
+      connection: local
+      register: ssh_status
+      ignore_errors: yes
+
+    - debug: var=ssh_status
+
+    - name: Clean known_hosts in EMS
+      command: docker exec {{ item.item.1 }} bash -c "ssh-keygen -R {{ CONTAINERIP }} -f /root/.ssh/known_hosts"
+      delegate_to: "{{item.item.0}}"
+      loop: "{{ EMSCONTNAMELIST }}"
+      when: item.stdout is not none and item.stdout | trim | length > 0
+      register: known_status
+      until: known_status is not failed
+      retries: 3
+      delay: 3
+      become: yes
+      become_method: sudo
+      ignore_errors: yes
+
+  when: ENABLE_PASSWORDLESS == 1 and SERVERTYPE in ["RLS Server","LCMS","Lawful Intercept Server","UWGLCMS","IDAPLanding","IDAPElasticSearch","IDAPHadoop","IDAPWebService","IDAPDashboardService","IDAPApiSrv","IDAPJobservice","IDAPGrafana","IDAPGraphite","IDAPkibana","IDAPNginx"]
+
+- block:
+    - name: Start Ipaconfig service in RHELIDM card
+      command: docker exec {{ CONTAINERNAME }} bash -c "systemctl start ipaconfig.service"
+      register: ipaconfig_service_output
+      ignore_errors: true
+
+    - name: Ipaconfig service output
+      debug:
+        var: ipaconfig_service_output
+
+    - fail: msg="Container configuration failed"
+      when:
+        - ipaconfig_service_output.rc != 0
+
+    - name: Start ContainerConfig service in RHELIDM card
+      command: docker exec {{ CONTAINERNAME }} bash -c "systemctl start contconfig.service"
+      register: cont_service_output
+      ignore_errors: true
+
+    - name: contconfig service output
+      debug:
+        var: cont_service_output
+
+    - fail: msg="Container configuration failed"
+      when:
+        - cont_service_output.rc != 0
+  when: SERVERTYPE == 'RHELIDM'
+
+- name: Check the Ipaconfig service state
+  command: docker exec {{ CONTAINERNAME }} bash -c "systemctl status ipaconfig.service"
+  register: ipaconfig_service_result
+  until: "'active (exited)' in ipaconfig_service_result.stdout or 'Active: failed' in ipaconfig_service_result.stdout"
+  retries: 40
+  delay: 10
+  become: yes
+  become_method: sudo
+  ignore_errors: true
+
+- name: Ipaconfig service status
+  debug:
+    var: ipaconfig_service_result
+
+- fail: msg="Container configuration failed"
+  when:
+    - ipaconfig_service_result.rc != 0
+
+- block:
+    - name: Get dsa key value from EMS
+      command: docker exec {{ item.item.1 }} bash -c "cat /root/.ssh/id_dsa.pub"
+      delegate_to: "{{item.item.0}}"
+      loop: "{{ EMSCONTNAMELIST }}"
+      when: item.stdout is not none and item.stdout | trim | length > 0
+      register: remote_content_encoded
+      become: yes
+      become_method: sudo
+      ignore_errors: yes
+
+    - name: Create /home/autoinstall/.ssh folder
+      command: docker exec {{ CONTAINERNAME }} bash -c "mkdir -p /home/autoinstall/.ssh  && chmod -Rv 0700 /home/autoinstall/.ssh && /bin/chown -Rv autoinstall:kodiakgroup /home/autoinstall/.ssh/"
+      become: yes
+      become_method: sudo
+
+    - name: update keyfile
+      command: docker exec {{ CONTAINERNAME }} /bin/bash -c "echo {{ item.stdout }} >> /home/autoinstall/.ssh/authorized_keys"
+      with_items: "{{ remote_content_encoded.results }}"
+      when: item.item.stdout is not none and item.item.stdout | trim | length > 0
+      become: yes
+      become_method: sudo
+      ignore_errors: yes
+
+    - name: set permissions for /home/autoinstall/.ssh/authorized_keys
+      command: docker exec {{ CONTAINERNAME }} /bin/bash -c "/bin/chmod -Rv 0600 /home/autoinstall/.ssh/authorized_keys && /bin/chown -Rv autoinstall:kodiakgroup /home/autoinstall/.ssh/authorized_keys"
+      register: output
+      become: yes
+      become_method: sudo
+
+    - debug: var=output
+  when: ENABLE_PASSWORDLESS == 1 and SERVERTYPE in ["RLS Server","LCMS","Lawful Intercept Server","UWGLCMS","IDAPLanding","IDAPElasticSearch","IDAPHadoop","IDAPWebService","IDAPDashboardService","IDAPApiSrv","IDAPJobservice","IDAPGrafana","IDAPGraphite","IDAPkibana","IDAPNginx","UnifiedRecorder"]
+
+- name: Check the ContainerConfig service state
+  command: docker exec {{ CONTAINERNAME }} bash -c "systemctl status contconfig.service"
+  register: contconfig_service_result
+  until: "'active (exited)' in contconfig_service_result.stdout or 'Active: failed' in contconfig_service_result.stdout"
+  retries: 60
+  delay: 15
+  become: yes
+  become_method: sudo
+  ignore_errors: true
+
+- name: ContainerConfig status
+  debug:
+    var: contconfig_service_result
+
+- fail: msg="Container configuration failed"
+  when:
+    - contconfig_service_result.rc != 0
+
+- import_role:
+    name: service
+  become: yes
+  become_method: sudo
+
+- import_role:
+    name: vault_service
+  become: yes
+  become_method: sudo
+  when:
+    - SERVERTYPE == 'VAULT'
+
+- name: Container launch success
+  debug: msg="Container launch successful"
+
