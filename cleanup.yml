@@ -1,0 +1,5 @@
+---
+- name: remove success file After all the tasks are executed successfully
+  file:
+     path: "{{status_file}}"
+     state: absent
