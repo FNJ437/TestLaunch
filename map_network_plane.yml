@@ -1,0 +1,67 @@
+---
+- name: Get networkmap details
+  include_tasks: get_networkmap_details.yml
+
+- set_fact:
+    resp: "{{ get_networkmap | json_query('json.dgInfo')|to_json|from_json }}"
+
+- set_fact:
+    xdm_dgid: >
+      {"dgid":[
+        {% for i in resp if i.CARDTYPE == 36 or i.CARDTYPE == 32 or i.CARDTYPE == 13 %}
+          {"context":"IPNETWORKPLANEMAPPINGINFO","action":"IPNETWORKPLANEMAPPINGINFO_GETALL","object":{"dgId":"{{i.DGID}}"}},
+        {% endfor %}
+          ]}
+
+- name: IPNETWORKPLANEMAPPINGINFO_GETALL
+  uri:
+     url: "http://{{ cms.url }}/cms/networkmap?v=1620732259069"
+     method: POST
+     headers:
+       Connection: 'keep-alive'
+       Authorization: 'Bearer {{ cms_login_token }} '
+       Accept: 'application/json, text/plain, */*'
+     validate_certs: no
+     body: '{{item}}'
+     body_format: json
+     status_code: 200
+  register: network_plane_map
+  with_items: "{{xdm_dgid|to_json|from_json|json_query('dgid')}}"
+  failed_when: network_plane_map.status not in [200]
+
+- set_fact:
+    xdm: "{{network_plane_map.results| to_json | from_json | json_query('[].json.data.values[]')}}"
+
+- set_fact:
+    xdm_network: >
+      {"network":[
+       {% for i in resp if i.CARDTYPE == 36 or i.CARDTYPE == 32 or i.CARDTYPE == 13 %}
+        {% for c in i.cardDetails if c.NODETYPE == 1 %}
+         {% for j in xdm if c.PTTSERVERID == j. PTTSERVERID %}
+          {"context":"IPNETWORKPLANEMAPPINGINFO","action":"IPNETWORKPLANEMAPPINGINFO_UPDATE","actionObject":{"PTTSERVERID":"{{c.PTTSERVERID}}","SIGNALINGCARDID":{{j.SIGNALINGCARDID}},"SUBSYSTEMID":{{j.SUBSYSTEMID}},"INTERFACEID":{{j.INTERFACEID}},"SUBNETID":"0","PREV_SUBNETID": {{j.SUBNETID}}},"object":{"dgId":"{{i.DGID}}"}},
+         {% endfor %}
+        {% endfor %}
+       {% endfor %}
+          ]}
+
+- name: IPNETWORKPLANEMAPPINGINFO_UPDATE
+  uri:
+     url: "http://{{ cms.url }}/cms/networkmap?v=1620732259069"
+     method: POST
+     headers:
+       Connection: 'keep-alive'
+       Authorization: 'Bearer {{ cms_login_token }} '
+       Accept: 'application/json, text/plain, */*'
+     validate_certs: no
+     body: '{{item}}'
+     body_format: json
+     status_code: 200
+  register: nw_map_upd
+  with_items: "{{xdm_network|to_json|from_json|json_query('network')}}"
+  when: dry_run == 0
+  failed_when: nw_map_upd.json.code | int not in [200, 201]
+
+- name: update the task in status file
+  lineinfile:
+      path: "{{status_file}}"
+      line: "map_network_plane"

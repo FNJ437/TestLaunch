@@ -1,0 +1,118 @@
+---
+- name: Get networkmap details
+  include_tasks: get_networkmap_details.yml
+
+- set_fact:
+    dgInfo: "{{ get_networkmap |json_query('json.dgInfo')|to_json |from_json  }}"
+    poc_servers: "{{ get_networkmap |json_query('json.dgInfo[? CARDTYPE == `32`]')|to_json |from_json }}"
+    media_dgid_pttserverid: "{{ get_networkmap |json_query('json.dgInfo[? CARDTYPE == `38` ].{dgid:DGID,pttserverid:cardDetails[0].PTTSERVERID}')|to_json |from_json  }}"
+
+- name: Get POC_MS_MAP
+  uri:
+    url: "http://{{cms.url}}/cms/networkmap?v=1633605424448"
+    method: POST
+    headers:
+      Connection: 'keep-alive'
+      Authorization: 'Bearer {{ result.json.accessToken }} '
+      Accept: 'application/json, text/plain, */*'
+    validate_certs: no
+    body: {"context":"POC_MS_MAP","action":"POC_MS_MAP_GETALL","object":{"dgId":"{{item.DGID}}"}}
+    body_format: json
+  register: mediaserver_map
+  loop: "{{poc_servers}}"
+  failed_when: mediaserver_map.status not in [200, 201]
+
+
+- set_fact:
+    mediaserver_map: >
+      {"_map": {% set var_map = mediaserver_map.results | json_query( "[].{pocdgid: item.DGID, pri_name: item.mediaCardDetails[? contains(HOSTNAME,'P') && SIGNALINGCARDTYPE == `38`].HOSTNAME, geo_name: item.mediaCardDetails[? contains(HOSTNAME,'G') && SIGNALINGCARDTYPE == `38`].HOSTNAME,MAP: json.data.values[]}" )  | to_json |from_json %} {{var_map}},}
+
+- set_fact:
+    media_map: >
+      {"medialist":[
+        {% for mediamap in mediaserver_map._map %}
+          {% if mediamap.pri_name|length == mediamap.geo_name|length %}
+            {% for i in range(mediamap.pri_name|length) %}
+              {% set pri_med = legacy | json_query( "[?clusterid == `1` || clusterid == `2`].containers[] | [?pocdgid == '" + mediamap.pocdgid + "' && name == '" + mediamap.pri_name[i] + "']") | to_json | from_json %}
+              {% set pri_apn = pri_med | json_query( "[].interface[?ip_type =='vir'].apn[]" ) | to_json | from_json %}
+              {% set geo_med = legacy | json_query( "[?clusterid == `2` || clusterid == `1`].containers[] | [?pocdgid == '" + mediamap.pocdgid + "' && name == '" + mediamap.geo_name[i] + "']" ) | to_json | from_json %}
+              {% set geo_apn = geo_med | json_query( "[].interface[?ip_type=='vir'].apn[]" ) | to_json | from_json %}
+              {% set mediaserverid = mediamap.MAP | json_query( "[?MEDIASERVERNAME == '" + mediamap.pri_name[i]  + "'][].MEDIASERVERID" ) | to_json | from_json | first %}
+              {% set parent_pttserverid = mediamap.MAP | json_query( "[?MEDIASERVERNAME == '" + mediamap.pri_name[i]  + "'][].PTTSERVERID" ) | to_json | from_json | first %}
+              {% for i in range(pri_apn|length) %}
+                {% set pri_alias_ip = pri_med| json_query( "[].interface[?ip_type =='vir' && apn == '" + pri_apn[i] + "'].ip[]" ) | to_json | from_json %}
+                {% set geo_alias_ip = geo_med| json_query( "[].interface[?ip_type =='vir' && apn == '" + geo_apn[i] + "'].ip[]" ) | to_json | from_json %}
+                {% for alias_index in range(pri_alias_ip|length) %}
+                  {
+                    "context":"POC_MS_ALIASIP", "action":"POC_MS_ALIASIP_ADD",
+                    "actionObject":{
+                      "MEDIASERVERID": "{{ mediaserverid }}",
+                      "ALIASIP_VERSION":"1",
+                      "APNID":"{{ pri_apn[i] }}",
+                      "PRIMARY_ALIASIP":"{{ pri_alias_ip[alias_index] }}",
+                      "GEO_ALIASIP":"{{ geo_alias_ip[alias_index] }}",
+                      "RTP_STARTPORT":"5000",
+                      "RTP_ENDPORT":"55000",
+                      "EXTFQDN":"",
+                      "PTTSERVERID":"{{ parent_pttserverid }}",
+                    },
+                      "object":{"dgId":"{{ mediamap.pocdgid }}"}
+                  },
+                {% endfor %}
+              {% endfor %}
+            {% endfor %}
+
+          {% elif mediamap.geo_name|length == 0 %}
+            {% for i in range(mediamap.pri_name|length) %}
+              {% set pri_med = legacy | json_query( "[?clusterid == `1` && nodetype == `1`].containers[] | [?pocdgid == '" + mediamap.pocdgid + "' && name == '" + mediamap.pri_name[i] + "']") | to_json | from_json %}
+              {% set pri_apn = pri_med | json_query( "[].interface[?ip_type =='vir'].apn[]" ) | to_json | from_json %}
+              {% set mediaserverid = mediamap.MAP | json_query( "[?MEDIASERVERNAME == '" + mediamap.pri_name[i]  + "'][].MEDIASERVERID" ) | to_json | from_json | first %}
+              {% set parent_pttserverid = mediamap.MAP | json_query( "[?MEDIASERVERNAME == '" + mediamap.pri_name[i]  + "'][].PTTSERVERID" ) | to_json | from_json | first %}
+              {% for i in range(pri_apn|length) %}
+                {% set pri_alias_ip = pri_med| json_query( "[].interface[?ip_type =='vir' && apn == '" + pri_apn[i] + "'].ip[]" ) | to_json | from_json %}
+                {% for alias_index in range(pri_alias_ip|length) %}
+                  {
+                    "context":"POC_MS_ALIASIP", "action":"POC_MS_ALIASIP_ADD",
+                    "actionObject":{
+                      "MEDIASERVERID": "{{ mediaserverid }}",
+                      "ALIASIP_VERSION":"1",
+                      "APNID":"{{ pri_apn[i] }}",
+                      "PRIMARY_ALIASIP":"{{ pri_alias_ip[alias_index] }}",
+                      "GEO_ALIASIP":"",
+                      "RTP_STARTPORT":"5000",
+                      "RTP_ENDPORT":"55000",
+                      "EXTFQDN":"",
+                      "PTTSERVERID":"{{ parent_pttserverid }}",
+                    },
+                      "object":{"dgId":"{{ mediamap.pocdgid }}"}
+                  },
+                {% endfor %}
+              {% endfor %}
+            {% endfor %}
+          {% endif %}
+        {% endfor %}
+      ]}
+
+- set_fact:
+    media_map: >
+      {"medialist":{{media_map.medialist|unique}}}
+
+- name: Map alias ip
+  uri:
+    url: "http://{{ cms.url }}/cms/config?v=1618385170120"
+    method: POST
+    headers:
+      Connection: 'keep-alive'
+      Authorization: 'Bearer {{ result.json.accessToken }} '
+      Accept: 'application/json, text/plain, */*'
+    validate_certs: no
+    body: "{{ item }}"
+    body_format: json
+  register: get_data_by_nwmap
+  with_items: "{{ media_map | json_query('medialist[]') }}"
+  failed_when: get_data_by_nwmap.json.code | int not in [200, 201]
+
+- name: update the task in status file
+  lineinfile:
+      path: "{{status_file}}"
+      line: "map_media_alias"

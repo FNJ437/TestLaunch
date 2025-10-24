@@ -1,0 +1,16 @@
+---
+- name: Get NETWORKMAP
+  uri:
+     url: "http://{{ cms.url }}/cms/config?v=1618385170120"
+     method: POST
+     headers:
+       Connection: 'keep-alive'
+       Authorization: 'Bearer {{ cms_login_token }} '
+       Accept: 'application/json, text/plain, */*'
+     validate_certs: no
+     timeout: 420
+     body: '{"context":"networkmap"}'
+     body_format: json
+  register: get_networkmap
+  failed_when: get_networkmap.status not in [200, 201]
+

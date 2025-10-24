@@ -1,0 +1,60 @@
+---
+- name: Get networkmap details
+  include_tasks: get_networkmap_details.yml
+
+- set_fact:
+    resp: "{{ get_networkmap | json_query('json')|to_json|from_json }}"
+
+- name: print the services
+  set_fact:
+    aa: "{{ resp | json_query(query) | first }}"
+  vars:
+    query: "dgInfo[?CONTAINERNAME=='XDM Server'].DGID"
+
+- name: SUBSCRPARTITIONINGCONFIG_GET
+  uri:
+     url: "http://{{ cms.url }}/cms/networkmap?v=1620732259069"
+     method: POST
+     headers:
+       Connection: 'keep-alive'
+       Authorization: 'Bearer {{ cms_login_token }} '
+       Accept: 'application/json, text/plain, */*'
+     validate_certs: no
+     body: '{"context":"SUBSCRPARTITIONINGCONFIG","action":"SUBSCRPARTITIONINGCONFIG_GETALL","object":{"dgId":"{{aa}}"}}'
+     body_format: json
+  register: subscriber_partition
+  failed_when: subscriber_partition.status not in [200, 201]
+
+- name: print the services
+  set_fact:
+    pttid: "{{ subscriber_partition |to_json| from_json | json_query('json.data.values[].PTTSERVERID') }}"
+
+- name: Configure subscriber partition details
+  set_fact:
+    subs_part: >
+       {"partition":[
+         {% for item in pttid %}
+         {"context":"SUBSCRPARTITIONINGCONFIG","action":"SUBSCRPARTITIONINGCONFIG_UPDATE","actionObject":{"PTTSERVERID":"{{item}}","MDNPARTITIONTYPE_POC":2,"ENABLECORPACCOUNTANCHORING":1,"MAXSUBSCRPERPOC":100000,"MAXSUBSCRPERXDMSRANGE":100000,"MAXSUBSCRPERXDMS":{{ subs_partition | int}}},"object":{"dgId":"{{aa}}"}},
+           {% endfor %}
+           ]}
+
+- name: SUBSCRPARTITIONINGCONFIG_UPDATE
+  uri:
+     url: "http://{{ cms.url }}/cms/networkmap?v=1620732259069"
+     method: POST
+     headers:
+       Connection: 'keep-alive'
+       Authorization: 'Bearer {{ cms_login_token }} '
+       Accept: 'application/json, text/plain, */*'
+     validate_certs: no
+     body: '{{item}}'
+     body_format: json
+  register: subscriber_partition_details
+  when: dry_run == 0
+  with_items: "{{subs_part|to_json|from_json|json_query('partition')}}"
+  failed_when: subscriber_partition_details.json.code | int not in [200, 201]
+
+- name: update the task in status file
+  lineinfile:
+      path: "{{status_file}}"
+      line: "configure_subspartitioning"

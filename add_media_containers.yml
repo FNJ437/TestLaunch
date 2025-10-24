@@ -1,0 +1,73 @@
+---
+- name: Get networkmap_detais
+  include_tasks: get_networkmap_details.yml
+
+- set_fact:
+    dgInfo: "{{ get_networkmap |json_query('json.dgInfo')|to_json |from_json  }}"
+
+- set_fact:
+    media_add: >
+      {"medialist":[
+        {% for item in dgInfo %}
+          {% for c in item.cardDetails %}
+            {% for nw in legacy if c.SIGNALINGCARDTYPE == 32 or c.SIGNALINGCARDTYPE == 33 %}
+              {% for ip in nw.containers if nw.clusterid|string() == c.CLUSTERID|string() and ip.nodetype|int == c.NODETYPE|int %}
+                {% if ip.sigcardid|int == 38 or ip.sigcardid|int == 39 %}
+                  {% set jq = "[? DGID == '" + item.DGID + "' ].cardDetails[]|[? NODETYPE==`" + c.NODETYPE|string()  + "`].SIGNALINGCARDID" %}
+                  {% if item.DGID == ip.pocdgid %}{% set ctrlcard = dgInfo | json_query(jq)|first %}
+                  {"context":"MANAGEDOBJECTS_NODE","action":"MANAGEDOBJECTS_NODE_MEDIA_ADD","actionObject":{"dgInfo":[{
+                   "DGID":"{{ ip.dgid }}",
+                   "DGNAME":"{{ ip.name }}",
+                   "CARDTYPE":"{{ ip.sigcardid }}",
+                   "cardDetails":[
+                   {
+                     "CONTROLLINGCARDID":"{{ ctrlcard }}",
+                     "SIGNALINGCARDTYPE":"{{ ip.sigcardid }}",
+                     "SIGNALINGCARD_NAME":"{{ ip.name }}",
+                     "CHASSISID":"{{ nw.chassisid }}",
+                     "DGID":"{{ ip.dgid }}",
+                     "CNTRLPLANE_IPADDRESS":"{{ ip.interface[1].ip }}",
+                     "CNTRLPLANE_INTERFACE_DEVICE":"{{ ip.interface[1].interface }}",
+                     "CNTRLPLANE_NETMASK_ADDRESS":"{{ ip.interface[1].netmask }}",
+                     "IPADDRESS":"{{ ip.interface[0].ip }}",
+                     "OAM_INTERFACE_DEVICE":"{{ ip.interface[0].interface }}",
+                     "OAM_NETMASK_ADDRESS":"{{ ip.interface[1].netmask }}",
+                     {% if setup_type != "wavelite"  %}
+                     "LOG_PLANE_IPADDRESS":"{{ip.interface[-1].ip}}",
+                     "LOG_INTERFACE_DEVICE":"{{ip.interface[-1].interface}}",
+                     "LOG_NETMASK_ADDRESS":"{{ip.interface[-1].netmask}}",
+                     {% endif %}
+                     "CLUSTERID":"{{ nw.clusterid }}",
+                     "HOSTNAME":"{{ ip.name }}"
+                   }]}]},"object":{"dgId":"{{ ip.pocdgid }}"}},
+                  {% endif %}
+                {% endif %}
+              {% endfor %}
+            {% endfor %}
+          {% endfor %}
+        {% endfor %}
+      ]}
+
+- name: Add media containers
+  uri:
+    url: "http://{{ cms.url }}/cms/config?v=1618385170120"
+    method: POST
+    headers:
+      Connection: 'keep-alive'
+      Authorization: 'Bearer {{ result.json.accessToken }} '
+      Accept: 'application/json, text/plain, */*'
+    validate_certs: no
+    timeout: 420
+    body: "{{ item }}"
+    body_format: json
+  register: get_data_by_nwmap
+  with_items: "{{ media_add | json_query('medialist[]') }}"
+  failed_when: get_data_by_nwmap.json.code | int not in [200, 201]
+
+- set_fact:
+    get_data_by_nwmap: "{{ get_data_by_nwmap |json_query('results[*].{ body: item, json: json}')|to_json |from_json  }}"
+
+- name: update the task in status file
+  lineinfile:
+      path: "{{status_file}}"
+      line: "add_media_containers"

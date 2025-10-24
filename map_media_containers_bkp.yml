@@ -1,0 +1,56 @@
+---
+
+- name: Get networkmap details
+  include_tasks: get_networkmap_details.yml
+
+- name: ExtractPOC PTTSERVERIDs
+  set_fact:
+    poc_pttserverid: >-
+            {% for server in get_networkmap.json.dgInfo %}{% if server.CARDTYPE == 32 and server.cardDetails[0].CLUSTERID == '1'%}{{server.cardDetails[0].PTTSERVERID}}{% endif %}{% endfor %}
+
+
+- name: POC_MS_MAP_GETALL
+  uri:
+    url: "http://{{ cms.url }}/cms/config?v=1621877645057"
+    method: POST
+    headers:
+      Connection: 'keep-alive'
+      Authorization: 'Bearer {{ cms_login_token }} '
+    validate_certs: no
+    body:
+      {"context":"POC_MS_MAP","action":"POC_MS_MAP_GETALL","object":{"dgId":"703"}}
+    body_format: json
+  register: map
+
+#- set_fact:
+#    Pri_ms: "{{ map |to_json| from_json | json_query('json.data.additionalData1[0].MEDIACARD_PTTSERVERID')}}"
+#    Sec_ms: "{{ map |to_json| from_json | json_query('json.data.additionalData1[1].MEDIACARD_PTTSERVERID')}}"
+#    Geo_ms: "{{ map |to_json| from_json | json_query('json.data.additionalData2[0].MEDIACARD_PTTSERVERID')}}"
+
+
+- set_fact:
+    media_map: >
+          {"medialist":[
+              {% for nw in legacy %}
+               {% for ip in nw.containers %}
+               {% if ip.sigcardid|int == 38 %}
+                  {"context":"POC_MS_MAP","action":"POC_MS_MAP_ADD","actionObject":{"MEDIASERVERNAME":"{{ ip.name }}","PRIMARY_MS_PTTSERVERID":"{{ map |to_json| from_json | json_query('json.data.additionalData1[0].MEDIACARD_PTTSERVERID')}}","GEO_MS_PTTSERVERID":{% if "{{ map |to_json| from_json | json_query('json.data.additionalData2[0].MEDIACARDTYPEID == '38.0'')}}"%} "{{ map |to_json| from_json | json_query('json.data.additionalData2[0].MEDIACARD_PTTSERVERID')}}"{% else %}"\"\""{% endif %}, "PTTSERVERID":"{{ poc_pttserverid }}"},"object":{"dgId":"{{ ip.pocdgid }}" }},
+               {% endif %}
+               {% endfor %}
+              {% endfor %}
+            ]}
+
+- name: Map media containers
+  uri:
+     url: "http://{{ cms.url }}/cms/config?v=1618385170120"
+     method: POST
+     headers:
+       Connection: 'keep-alive'
+       Authorization: 'Bearer {{ result.json.accessToken }} '
+       Accept: 'application/json, text/plain, */*'
+     validate_certs: no
+     body: "{{ item }}"
+     body_format: json
+  register: get_data_by_nwmap
+  with_items: "{{ media_map | json_query('medialist[]') }}"
+  when: dry_run == 0

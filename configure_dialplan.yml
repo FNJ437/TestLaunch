@@ -1,0 +1,102 @@
+---
+- name: Get networkmap details
+  include_tasks: get_networkmap_details.yml
+
+- set_fact:
+    resp: "{{ get_networkmap | json_query('json.dgInfo')|to_json|from_json }}"
+
+- debug:
+    msg: "{{resp}}"
+
+- set_fact:
+    dial_plan_delete: >
+      {"delete":[
+        {% for i in resp if i.CARDTYPE == 32 or i.CARDTYPE == 36 or i.CARDTYPE == 13 %}
+         {% for c in i.cardDetails if c.NODETYPE == 1 %}
+            {"context":"DIALPLANINFO","action":"DIALPLANINFO_DELETE","actionObject":{"PTTSERVERID":"{{c.PTTSERVERID}}","COUNTRYCODE":"1"},"object":{"dgId":"{{i.DGID}}"}},
+         {% endfor %}
+        {% endfor %}
+      ]}
+
+- debug:
+    msg: "{{dial_plan_delete |to_json |from_json |json_query('delete') }}"
+
+- name: DIALPLANINFO_DELETE
+  uri:
+     url: "http://{{ cms.url }}/cms/networkmap?v=1620732259069"
+     method: POST
+     headers:
+       Connection: 'keep-alive'
+       Authorization: 'Bearer {{ cms_login_token }} '
+       Accept: 'application/json, text/plain, */*'
+     validate_certs: no
+     body: '{{item}}'
+     body_format: json
+     status_code: 200
+  with_items: "{{dial_plan_delete|to_json|from_json|json_query('delete')}}"
+  register: dial_plan_del
+  failed_when: dial_plan_del.json.code | int not in [200, 201]
+
+- set_fact:
+    dial_plan_add: >
+      {"add":[
+        {% for i in resp if i.CARDTYPE == 32 or i.CARDTYPE == 36 or i.CARDTYPE == 13 %}
+         {% for c in i.cardDetails if c.NODETYPE == 1 %}
+          {% for item in dial_plan %}
+            {"context":"DIALPLANINFO","action":"DIALPLANINFO_ADD","actionObject":{"NETWORKNUMBERINGPLAN":{{item.national_numbering}},"COUNTRYCODE":"{{item.country_code}}","NATIONALDIALPREFIX":"{{item.national_dial_prefix}}","INTERNATIONALDIALPREFIX":"{{item.internation_dial_prefix}}","ISDEFAULT":1,"PTTSERVERID":"{{c.PTTSERVERID}}"},"object":{"dgId":"{{i.DGID}}"}},
+          {% endfor %}
+         {% endfor %}
+        {% endfor %}
+      ]}
+
+- name: DIALPLANINFO_ADD
+  uri:
+     url: "http://{{ cms.url }}/cms/networkmap?v=1620732259069"
+     method: POST
+     headers:
+       Connection: 'keep-alive'
+       Authorization: 'Bearer {{ cms_login_token }} '
+       Accept: 'application/json, text/plain, */*'
+     validate_certs: no
+     body: '{{item}}'
+     body_format: json
+     status_code: 200
+  with_items: "{{dial_plan_add|to_json|from_json|json_query('add')}}"
+  register: dial_plan_add
+  when: dry_run == 0
+  failed_when: dial_plan_add.json.code | int not in [200, 201]
+
+
+- set_fact:
+    dial_plan_global: >
+      {"global":[
+        {% for item in dial_plan %}
+          {% for i in resp if i.CARDTYPE == 36 %}
+            {% for c in i.cardDetails if c.NODETYPE == 1 or c.NODETYPE == 3 %}
+             {"context":"MICROSVC_GLOBAL_ATTR_VALUE_CONFIG","action":"MICROSVC_GLOBAL_ATTR_VALUE_CONFIG_UPDATE","object":{},"actionObject":[{"PARAMNAME":"DIALPLANCONFIG","PARAMVALUE":"{\"countrycode\":{{item.country_code}},\"networkNumberingPlan\":{{item.national_numbering}},\"nationalDialPrefix\":\"{{item.national_dial_prefix}}\",\"intlDialPrefix\":\"{{item.internation_dial_prefix}}\"}","CLUSTERID":{{c.CLUSTERID}}}]},
+            {% endfor %}
+          {% endfor %}
+        {% endfor %}
+      ]}
+
+- name: Add Dial plan to global
+  uri:
+     url: "http://{{ cms.url }}/cms/networkmap?v=1620732259069"
+     method: POST
+     headers:
+       Connection: 'keep-alive'
+       Authorization: 'Bearer {{ result.json.accessToken }} '
+       Accept: 'application/json, text/plain, */*'
+     validate_certs: no
+     body: '{{item}}'
+     body_format: json
+     status_code: 200
+  with_items: "{{dial_plan_global|to_json|from_json|json_query('global')}}"
+  register: dial_plan_add
+  when: dry_run == 0
+  failed_when: dial_plan_add.json.code | int not in [200, 201]
+
+- name: update the task in status file
+  lineinfile:
+      path: "{{status_file}}"
+      line: "configure_dialplan"

@@ -1,0 +1,42 @@
+---
+- name: MICROSVC_GLOBAL_CLUSTER_INFO_CONFIG_GETALL
+  uri:
+    url: "http://{{ cms.url }}/cms/networkmap?v=1620732259069"
+    method: POST
+    headers:
+      Connection: 'keep-alive'
+      Authorization: 'Bearer {{ cms_login_token }} '
+      Accept: 'application/json, text/plain, */*'
+    validate_certs: no
+    body:
+      '{"context":"MICROSVC_GLOBAL_CLUSTER_INFO_CONFIG","action":"MICROSVC_GLOBAL_CLUSTER_INFO_CONFIG_GETALL","actionObject":{}}'
+    body_format: json
+    status_code: 200
+  register: get_clusterinfo
+  failed_when: get_clusterinfo.status not in [200, 201]
+
+- set_fact:
+    syncgwurl: "{{'https://syncgw'~wildcard~'/ptxdata'}}"
+    synclocurl: "{{'https://syncloc'~wildcard~'/ptxdata'}}"
+
+- name: MICROSVC_GLOBAL_CLUSTER_INFO_CONFIG_UPDATE
+  uri:
+     url: "http://{{ cms.url }}/cms/networkmap?v=1620732259069"
+     method: POST
+     headers:
+       Connection: 'keep-alive'
+       Authorization: 'Bearer {{ cms_login_token }} '
+       Accept: 'application/json, text/plain, */*'
+     validate_certs: no
+     body: '{"context":"MICROSVC_GLOBAL_CLUSTER_INFO_CONFIG","action":"MICROSVC_GLOBAL_CLUSTER_INFO_CONFIG_UPDATE","actionObject":{"LOCDATAURIWIFI":"{{synclocurl}}","KODIAK_MAPS_GEO_WIFIURI":null,"CLUSTERID":0,"COUNTRYCODE":"{{item.country_code}}","PTXBUCKETURIWIFI":"{{syncgwurl}}","PTTBUCKETURIWIFI":"{{syncgwurl}}","KODIAK_MAPS_WIFIURI":null,"DESC":"Default cluster-Id for the primary site deployment.","ISCONFIGURED":1,"ISCONFIGURED_DISPLAYNAME":"Configured"}}'
+     body_format: json
+     status_code: 200
+  with_items: "{{dial_plan}}"
+  register: mcs_cluster_cfg
+  when: dry_run == 0
+  failed_when: mcs_cluster_cfg.json.code | int not in [200, 201]
+
+- name: update the task in status file
+  lineinfile:
+      path: "{{status_file}}"
+      line: "configure_clusterinfo"

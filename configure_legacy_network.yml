@@ -1,0 +1,96 @@
+---
+- name: Get network map details
+  include_tasks: get_networkmap_details.yml
+
+- set_fact:
+    dgInfo: "{{ get_networkmap |json_query('json.dgInfo')|to_json |from_json  }}"
+
+- debug:
+    msg: "{{ dgInfo }}"
+
+- set_fact:
+    subnets1: >
+       {"iplist":[
+          {% for item in dgInfo %}
+           {% for c in item.cardDetails %}
+            {% set idx = loop.index %}
+            {% for nw in legacy %}
+              {% for ip in nw.containers if nw.clusterid|string() == c.CLUSTERID|string() %}
+               {% for if in ip.interface if (ip.sigcardid not in (38, 39) and ip.sigcardid|string() == c.SIGNALINGCARDTYPE|string() and ip.name|string() == c.SIGNALINGCARD_NAME) %}
+                  {
+                  "context": "SIGNALINGCARDALIASIPINFO",
+                  {% if if.subnet_type == 'oam' %}
+                  "action": "SIGNALINGCARDALIASIPINFO_UPDATE",
+                  {% else %}
+                  "action": "SIGNALINGCARDALIASIPINFO_ADD",
+                  {% endif %}
+                  "actionObject":[{
+                      "BROADCAST_ADDRESS": "{{ if.broadcast }}",
+                      "ENABLE_ARP_INTERFACE": 1,
+                      {% if if.subnet_type == 'service' and ip.sigcardid == '32' %}
+                      "FQDN": "{{ip.cardtype|lower~wildcard}}",
+                      {% elif if.subnet_type == 'service' and ip.sigcardid == '33' and ip.nodetype == 2 %}
+                      "FQDN": "{{ip.cardtype|lower~wildcard}}",
+                      {% elif if.subnet_type == 'service' and ip.sigcardid == '33' and ip.nodetype == 3 %}
+                      "FQDN": "{{ip.cardtype|lower~'g'~wildcard}}",
+                      {% else %}
+                      "FQDN": "",
+                      {% endif %}
+                      "INTERFACE_DEVICE": "{{ if.interface }}",
+                      "IPADDRESS": "{{ if.ip }}",
+                      {% if if.ip_type == 'phy' %}
+                      "IPADDRESS_TYPE": "1",
+                      {% elif if.ip_type == 'vir' %}
+                      "IPADDRESS_TYPE": "0",
+                      {% endif %}
+                      "IPV6ADDRESS": "",
+                      "NETMASK_ADDRESS": "{{ if.netmask }}",
+                      "PTTSERVERID": "{{ c.PTTSERVERID }}",
+                      "SIGNALINGCARDID": "{{ c.SIGNALINGCARDID }}",
+                      {% if if.subnet_type == 'oam' %}
+                      "SUBNETTYPE": "2",
+                      {% elif if.subnet_type == 'service' %}
+                      "SUBNETTYPE": "0",
+                      {% elif if.subnet_type == 'log' %}
+                      "SUBNETTYPE": "3",
+                      {% endif %}
+                  }],
+                  "object": {
+                      "dgId": "{{ ip.dgid }}",
+                  },
+              },
+                 {% endfor %}
+                {% endfor %}
+               {% endfor %}
+             {% endfor %}
+            {% endfor %}
+       ]}
+
+- debug:
+    var: subnets1
+
+- name: SIGNALINGCARDALIASIPINFO_ADD
+  uri:
+    url: "http://{{ cms.url }}/cms/config?v=1618385170120"
+    method: POST
+    headers:
+      Connection: 'keep-alive'
+      Authorization: 'Bearer {{ result.json.accessToken }} '
+      Accept: 'application/json, text/plain, */*'
+    validate_certs: no
+    body: "{{ item }}"
+    body_format: json
+  register: sig_card_add
+  with_items: "{{ subnets1| json_query('iplist[]') }}"
+  failed_when: sig_card_add.json.code | int not in [200, 201]
+
+- set_fact:
+    sig_card_add: "{{ sig_card_add |json_query('results[*].[item, json]')|to_json |from_json  }}"
+
+- debug:
+    msg: "{{ sig_card_add }}"
+
+- name: update the task in status file
+  lineinfile:
+      path: "{{status_file}}"
+      line: "configure_legacy_network"

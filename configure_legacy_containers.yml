@@ -1,0 +1,81 @@
+---
+- name: Get networkmap details
+  include_tasks: get_networkmap_details.yml
+
+- set_fact:
+    dgInfo: "{{ get_networkmap |json_query('json.dgInfo')|to_json |from_json  }}"
+
+- debug:
+    msg: "{{ dgInfo }}"
+
+- name: Configure legacy containers
+  set_fact:
+    container_config: >
+      {"cont_list":[
+        {% for nw in legacy %}
+          {% for ip in nw.containers %}
+            {% set sigid_qry = "[? DGID == '" + ip.dgid + "'].cardDetails[]|[? SIGNALINGCARD_NAME == '" + ip.name  + "'].SIGNALINGCARDID" %}
+            {% set sig_id = dgInfo | json_query(sigid_qry)| first %}
+            {% set pttid_qry_1 = "[? DGID == '" + ip.dgid + "'].cardDetails[]|[? CLUSTERID == '" ~ nw.clusterid ~ "' && SIGNALINGCARDTYPE == `" + ip.sigcardid|string %}
+            {% set pttid_qry = pttid_qry_1 + "`].PTTSERVERID" %}
+
+            {% set pttid = dgInfo | json_query(pttid_qry)| first %}
+            {
+              "context":"MICROSVC_CONTAINERCONFIG",
+              "action":"MICROSVC_CONTAINERCONFIG_CONFIGURE",
+              "actionObject":
+                [
+                  {
+                    "CONTAINER_SIGCARDID": {{ sig_id }},
+                    "IPADDRESS":"{{ ip.interface[0].ip }}",
+                    "SIGNALINGCARDTYPE": {{ ip.sigcardid }},
+                    "STATUS":0,
+                    "IMAGE":"{{ ip.image }}",
+                    "ROUTES":{% if nw.clusterid == 1 %} "{{ nw.route }}" {% elif nw.clusterid == 2 %} "{{ nw.route }}" {% endif %},
+                    "INTERFACE":null,
+                    "SIGNALINGCARD_NAME":"{{ ip.name }}",
+                    "PTTSERVERID":"{{ pttid }}",
+                    "VAULT_UNSEAL_METHOD":null,
+                    "CPU_SET_CPUS":null,
+                    "SYNCGWREP_SYNCGWFUNC_FLAG":0
+                  }
+                ],
+              "object":
+                {
+                  "dgId":"{{ ip.dgid }}"
+                }
+            },
+          {%- endfor -%}
+        {% endfor -%}
+      ]}
+
+- debug:
+    msg: "{{container_config}}"
+
+- name: MICROSVC_CONTAINERCONFIG_CONFIGURE
+  uri:
+     url: "http://{{ cms.url }}/cms/config?v=1618385170120"
+     method: POST
+     headers:
+       Connection: 'keep-alive'
+       Authorization: 'Bearer {{ result.json.accessToken }} '
+       Accept: 'application/json, text/plain, */*'
+     validate_certs: no
+     timeout: 420
+     body: "{{ item }}"
+     body_format: json
+  register: get_data_by_nwmap
+  with_items: "{{ container_config | json_query('cont_list[]') }}"
+  failed_when: get_data_by_nwmap.json.code | int not in [200, 201]
+
+- set_fact:
+    get_data_by_nwmap: "{{ get_data_by_nwmap |json_query('results[*].json')|to_json |from_json  }}"
+
+- debug:
+    msg: "{{ get_data_by_nwmap }}"
+#{% set pttid_qry = "[? DGID == '" + ip.dgid + "'].cardDetails[]|[? CLUSTERID == '" ~ nw.clusterid ~ "' && SIGNALINGCARDTYPE == `" + ip.sigcardid + "` ].PTTSERVERID" %}
+
+- name: update the task in status file
+  lineinfile:
+      path: "{{status_file}}"
+      line: "configure_legacy_containers"

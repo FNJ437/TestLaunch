@@ -1,0 +1,302 @@
+---
+- block:
+   - include_vars: global.yml
+  tags: [ untagged, always ]
+
+- block:
+   - include_vars: chassis.yml
+  tags: [ untagged, always ]
+
+- block:
+   - include_vars: legacy_config.yml
+  tags: [ untagged, always ]
+
+- block:
+   - include_vars: microservices.yml
+  tags: [ untagged, always ]
+
+- block:
+   - include_vars: rhelidm.yml
+  tags: [ untagged, always ]
+
+- block:
+   - include_vars: poc_config.yml
+  tags: [ untagged, always ]
+
+- block:
+   - include_vars: xdm_config.yml
+  tags: [ untagged, always ]
+
+- block:
+   - include_vars: micro_service_config.yml
+  tags: [ untagged, always ]
+
+- block:
+   - include_vars: f5_config.yml
+  tags: [ untagged, always ]
+
+- block:
+   - include_vars: f5_vs.yml
+  tags: [ untagged, always ]
+
+- block:
+   - include_vars: MediaAlias.yml
+  tags: [ untagged, always ]
+
+- block:
+   - include_vars: MediaExternal.yml
+  tags: [ untagged, always ]
+
+
+- block:
+    - set_fact:
+        status_file: "/DG/activeRelease/POCplaybook/success_file.txt"
+
+    - name: create status file if does not exist
+      file:
+        state: touch
+        path: "{{status_file}}"
+
+    - name: read the contents of a file
+      slurp:
+        src: "{{status_file}}"
+      register: status_data
+
+    - debug:
+        msg: "{{ (status_data['content'] | b64decode).splitlines() }}"
+
+    - set_fact:
+         status_check_list: "{{ (status_data['content'] | b64decode).splitlines() }}"
+  tags: [ untagged, always ]
+
+
+
+- block:
+   - name: generate login token
+     include_tasks: generate_login_token.yml
+  tags: [ untagged, always ]
+
+- block:
+  - name: update chassis details
+    include_tasks: update_chassis.yml
+  tags: [ untagged, add_chassis ]
+  when: "'update_chassis' not in status_check_list"
+
+- block:
+   - name: update VLAN details
+     include_tasks: update_vlan.yml
+  tags: [ untagged, add_vlan ]
+  when: "'update_vlan' not in status_check_list"
+
+- block:
+   - name: add legacy containers
+     include_tasks: add_legacy_containers.yml
+  tags: [ untagged, add_poc ]
+  when: "'add_legacy_containers' not in status_check_list"
+
+- block:
+   - name: configure legacy containers
+     include_tasks: configure_legacy_network.yml
+  tags: [ untagged, legacy_nwconfig ]
+  when: "'configure_legacy_network' not in status_check_list"
+
+- block:
+   - name: add media containers
+     include_tasks: add_media_containers.yml
+  tags: [ untagged, add_media ]
+  when: "'add_media_containers' not in status_check_list"
+
+- block:
+   - name: configure legacy containers
+     include_tasks: configure_legacy_containers.yml
+  tags: [ untagged, legacy_cntconfig ]
+  when: "'configure_legacy_containers' not in status_check_list"
+
+- block:
+   - name: map media container
+     include_tasks: map_media_containers.yml
+  tags: [ untagged, map_media ]
+  when: "'map_media_containers' not in status_check_list"
+
+- block:
+   - name: map media alias
+     include_tasks: map_media_alias.yml
+  tags: [ untagged, map_medalials ]
+  when: "'map_media_alias' not in status_check_list"
+
+- block:
+   - name: configure media alias
+     include_tasks: configure_media_alias.yml
+  tags: [ untagged, config_medalials ]
+  when: "'configure_media_alias' not in status_check_list"
+
+- block:
+   - name: configure LI Server
+     include_tasks: configure_liserver.yml
+  tags: [ untagged, config_li ]
+  when: "'liserver_configuration' not in status_check_list"
+
+- block:
+   - name: add rhelidm containers
+     include_tasks: add_rhelidm_containers.yml
+  tags: [ untagged, add_rhelidm ]
+  when: "'add_rhelidm_containers' not in status_check_list"
+
+- block:
+   - name: configure rhelidm network
+     include_tasks: configure_rhelidm_network.yml
+  tags: [ untagged, nw_rhelidm ]
+  when: "'configure_rhelidm_network' not in status_check_list"
+
+- block:
+   - name: configure rhelidm container
+     include_tasks: configure_rhelidm_containers.yml
+  tags: [ untagged, config_rhelidm ]
+  when: "'configure_rhelidm_containers' not in status_check_list"
+
+- block:
+   - name: service network config
+     include_tasks: service_network_config.yml
+  tags: [ untagged, svc_network ]
+  when: "'service_network_config' not in status_check_list"
+
+- block:
+   - name: add microservice containers
+     include_tasks: add_microservice_containers.yml
+  tags: [ untagged, add_mcs ]
+  when: "'add_microservice_containers' not in status_check_list"
+
+- block:
+   - name: configure microservice containers
+     include_tasks: configure_microservice_containers.yml
+  tags: [ untagged, config_mcs ]
+  when: "'configure_microservice_containers' not in status_check_list"
+
+- block:
+   - name: configure dialplan
+     include_tasks: configure_dialplan.yml
+  tags: [ untagged, config_dial ]
+  when: "'configure_legacy_network' not in status_check_list"
+
+- block:
+   - name: map backup server
+     include_tasks: map_backup_server.yml
+  tags: [ untagged, map_bkp ]
+  when: "'map_backup_server' not in status_check_list"
+
+- block:
+   - name: configure subscriber partitioning
+     include_tasks: configure_subspartitioning.yml
+  tags: [ untagged, config_subs ]
+  when: "'configure_subspartitioning' not in status_check_list"
+
+- block:
+   - name: configure subscriber capacity
+     include_tasks: configure_subscapacity.yml
+  tags: [ untagged, subs_capacity ]
+  when: "'configure_subscapacity' not in status_check_list"
+
+- block:
+   - name: configure clusterinfo
+     include_tasks: configure_clusterinfo.yml
+  tags: [ untagged, config_clusinfo ]
+  when: "'configure_clusterinfo' not in status_check_list"
+
+- block:
+   - name: configure apn
+     include_tasks: configure_apn.yml
+  tags: [ untagged, config_apn ]
+  when: "'configure_apn' not in status_check_list"
+
+- block:
+   - name: map network plane
+     include_tasks: map_network_plane.yml
+  tags: [ untagged, map_nwplane ]
+  when: "'map_network_plane' not in status_check_list"
+
+- block:
+   - name: configure f5
+     include_tasks: configure_f5.yml
+  tags: [ untagged, config_f5 ]
+  when: "'configure_f5' not in status_check_list"
+
+- block:
+   - name: configure POC XDM MCS svc
+     include_tasks: poc_xdm_svc.yml
+  tags: [ untagged, svc_config ]
+  when: "'poc_xdm_svc' not in status_check_list"
+
+- block:
+   - name: micro service configuration
+     include_tasks: micro_svc_configuration.yml
+  tags: [ untagged, mcs_svc ]
+  when: "'micro_svc_configuration' not in status_check_list"
+
+- block:
+   - name: micro service common configuration
+     include_tasks: micro_common_configuration.yml
+  tags: [ untagged, mcs_common ]
+  when: "'micro_common_configuration' not in status_check_list"
+
+- block:
+   - name: generate and store fqdns
+     include_tasks: generate_and_store_fqdns.yml
+  tags: [ untagged, print_fqdn ]
+  when: "'generate_and_store_fqdns' not in status_check_list"
+
+- block:
+   - name: Pinning
+     include_tasks: pinning.yml
+  tags: [ untagged, pinning ]
+  when: "'pinning' not in status_check_list"
+
+- block:
+   - name: F5 Global poc vs config
+     include_tasks: vs.yml
+  tags: [ untagged, f5_vs ]
+  when: "'vs' not in status_check_list"
+
+- block:
+   - name: F5 Global poc snat config
+     include_tasks: snat_pool.yml
+  tags: [ untagged, f5_snat_pool ]
+  when: "'snat_pool' not in status_check_list"
+
+- block:
+   - name: F5 context addtion
+     include_tasks: context.yml
+  tags: [ untagged, f5_context ]
+  when: "'context' not in status_check_list"
+
+- block:
+   - name: F5 media vs config
+     include_tasks: media_vs.yml
+  tags: [ untagged, f5_media_vs ]
+  when: "'media_vs' not in status_check_list"
+
+- block:
+   - name: F5 media snat config
+     include_tasks: snat_pool_media.yml
+  tags: [ untagged, f5_media_snat ]
+  when: "'snat_pool_media' not in status_check_list"
+
+- block:
+   - name: Media external ip config
+     include_tasks: external_ip.yml
+  tags: [ untagged, external_ip ]
+  when: "'external_ip' not in status_check_list"
+
+- block:
+   - name: Update SSL Profile Names
+     include_tasks: UpdateSSLProfile.yml
+  tags: [ untagged, UpdateSSLProfile ]
+  when: "'update_ssl_profile' not in status_check_list"
+
+- block:
+    - name: remove success file After all the tasks are executed successfully
+      file:
+         path: "{{status_file}}"
+         state: absent
+  tags: [ untagged, delete_success ]
+
+

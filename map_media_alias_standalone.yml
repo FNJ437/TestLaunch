@@ -1,0 +1,47 @@
+---
+- name: Get networkmap details
+  include_tasks: get_networkmap_details.yml
+
+- set_fact:
+    dgInfo: "{{ get_networkmap |json_query('json.dgInfo')|to_json |from_json  }}"
+
+- debug:
+    msg: "{{ dgInfo }}"
+
+- set_fact:
+    media_map: >
+          {"medialist":[
+              {% set media_index = 0 %}
+              {% for nw in legacy %}
+               {% for ip in nw.containers if ip.sigcardid|int == 38 %}
+                {% set outer_loop = loop %}
+                 {% for ifc in ip.interface if ip.sigcardid|int == 38 and ifc.ip_type == 'vir' and nw.nodetype == 1 %}
+                 {% set med_index = outer_loop.index0 %}
+                 {% set pttid = "[? DGID == '" + ip.dgid + "' ].cardDetails[]|[? CLUSTERID == '1' && SIGNALINGCARDTYPE == `38` ].PARENTPTTSERVERID" %}
+                 {% set poc_pttserverid = dgInfo | json_query(pttid) | first %}
+                 {% set primed_qery = "[? clusterid == `1` && nodetype == `1`].containers[] | [? sigcardid == '38' ]|[" ~ med_index  ~ "].interface[? ip_type == 'vir' && apn == '" + ifc.apn + "' ].ip" %}
+                 {% set pri_med = legacy | json_query(primed_qery)| first %}
+                 {"context":"POC_MS_ALIASIP","action":"POC_MS_ALIASIP_ADD","actionObject":{"MEDIASERVERID":"{{ med_index + 1 }}","ALIASIP_VERSION":"1","APNID":"{{ ifc.apn }}","PRIMARY_ALIASIP":"{{ pri_med }}","GEO_ALIASIP":"","RTP_STARTPORT":"5000","RTP_ENDPORT":"55000","EXTFQDN":"","PTTSERVERID":"{{ poc_pttserverid }}","object":{"dgId":"{{ ip.pocdgid }}"}}},
+                 {% set media_index  = media_index + 1 %}
+                 {% endfor %}
+               {% endfor %}
+              {% endfor %}
+            ]}
+
+
+- name: Map alias ip
+  uri:
+     url: "http://{{ cms.url }}/cms/config?v=1618385170120"
+     method: POST
+     headers:
+       Connection: 'keep-alive'
+       Authorization: 'Bearer {{ cms_login_token }} '
+       Accept: 'application/json, text/plain, */*'
+     validate_certs: no
+     body: "{{ item }}"
+     body_format: json
+  register: get_data_by_nwmap
+  with_items: "{{ media_map | json_query('medialist[]') }}"
+  when: dry_run == 0
+  failed_when: get_data_by_nwmap.status not in [200, 201]
+
