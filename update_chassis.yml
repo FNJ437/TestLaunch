@@ -53,7 +53,7 @@
 
     - name: CHASSISINFO_UPDATE
       uri:
-        url: "http://{{ cmsurl }}/cms/networkmap?v=1620732259069""
+        url: "http://{{ cmsurl }}/cms/networkmap?v=1620732259069"
         method: POST
         headers:
           Connection: 'keep-alive'
