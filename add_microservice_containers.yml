@@ -1,0 +1,85 @@
+---
+- hosts: all
+  become: yes
+  become_method: sudo
+  gather_facts: false
+
+  tasks:
+    - block:
+        - name: Get networkmap details
+          include_tasks: get_networkmap_details.yml
+        
+        - name: Get the list of microservice containers
+          uri:
+             url: "http://{{ cmsurl }}/cms/networkmap?v=1620732259069"
+             method: POST
+             headers:
+               Connection: 'keep-alive'
+               Authorization: 'Bearer {{ cms_login_token }} '
+               Accept: 'application/json, text/plain, */*'
+             validate_certs: no
+             timeout: 420
+             body: '{"context":"MICROSVC_CONTAINERCONFIG","action":"MICROSVC_CONTAINERCONFIG_GETALL","object":{"dgId":""}}'
+             body_format: json
+          register: container_details
+          failed_when: container_details.status not in [200, 201]
+        
+        - name: Filter microservice containers list
+          set_fact:
+              container_config: "{{ container_details |to_json| from_json | json_query('json.data.values[]') }}"
+        
+        - name: Fetch MCS Cards to be added
+          microservice_add:
+             remote_data: "{{get_networkmap.json.dgInfo}}"
+             local_data: "{{ microservices }}"
+             remote_config: "{{container_config}}"
+          register: local_mcs_data
+        
+        - name: display local mcs data
+          debug:
+            msg: "{{local_mcs_data}}"
+        
+        - name: Generate add microservice containers request
+          set_fact:
+            subnets: >
+                    {"context":"MICROSVC_CARDCONFIG","action":"MICROSVC_CARDCONFIG_ADD","actionObject":[
+                    {% for card_key, count in local_mcs_data.local_card_count.items() %}
+                       {% if count != 0 %}
+                            {% for counter in range(count) %}
+                                # card_key is combination of cardname, clusterid, chassis id and version separated by '-'
+                                {"INSTANCE_TYPE":"{{ card_key.split('-')[0] }}","NO_OF_INSTANCE":1,"VERSION":"{{ card_key.split('-')[3] }}","CLUSTERID":"{{ card_key.split('-')[1] }}","CHASSISID":"{{ card_key.split('-')[2] }}","INSTANCE_IPADDRESS":"","INSTANCE_HOSTNAME":""},
+                            {% endfor %}
+                       {% endif %}
+                    {% endfor %}
+                    ]}
+        
+        
+        - debug:
+            msg: "{{ subnets  }}"
+        
+        
+        - name: Add microservice containers
+          uri:
+             url: "http://{{ cmsurl }}/cms/networkmap?v=1620732259069"
+             method: POST
+             headers:
+               Connection: 'keep-alive'
+               Authorization: 'Bearer {{ cms_login_token }} '
+               Accept: 'application/json, text/plain, */*'
+             validate_certs: no
+             timeout: 5400
+             body: "{{ subnets }}"
+             body_format: json
+          register: add_container_resp
+          when: dry_run == 0
+          failed_when: add_container_resp.json.code | int not in [200, 201]
+        
+        - debug:
+            msg: "{{ add_container_resp  }}"
+        
+        - name: update the task in status file
+          lineinfile:
+              path: "{{status_file}}"
+              line: "add_microservice_containers"
+               
+      when: "'add_microservice_containers' not in status_check_list"
