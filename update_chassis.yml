@@ -3,6 +3,7 @@
   become: yes
   become_method: sudo
   gather_facts: false
+  tags: update_chassis
 
   tasks:
     - block:
