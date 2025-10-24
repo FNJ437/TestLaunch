@@ -19,5 +19,12 @@
 
     - name: Set CMS login token if present
       set_fact:
-        cms_login_token: "{{ result.json.accessToken }}"
+        cms_token: "{{ result.json.accessToken }}"
       when: result.json.accessToken is defined
+      
+    - name: Aggregating packages_installed stat per host
+      ansible.builtin.set_stats:
+        data:
+          cms_login_token: '{{ result.json.accessToken }}'
+        aggregate: no
+
