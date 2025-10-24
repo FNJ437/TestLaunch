@@ -3,8 +3,8 @@
      url: "http://{{ cmsurl }}/cms/login?v=1618381584572"
      method: POST
      body:
-       user: '{{ username }}'
-       password: '{{ password }}'
+       user: "{{ lookup('env', 'CMS_USERNAME') }}"
+       password: "{{ lookup('env', 'CMS_PASSWORD') }}"
      body_format: json
      headers:
        Connection: 'keep-alive'
