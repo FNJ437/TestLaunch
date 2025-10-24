@@ -1,0 +1,23 @@
+- hosts: all
+  become: yes
+  become_method: sudo
+  gather_facts: false
+
+  tasks:
+    - name: Generate the API authenticator token.
+      uri:
+        url: "http://{{ cmsurl }}/cms/login?v=1618381584572"
+        method: POST
+        body:
+          user: "{{ lookup('env', 'CMS_USERNAME') }}"
+          password: "{{ lookup('env', 'CMS_PASSWORD') }}"
+        body_format: json
+        headers:
+          Connection: 'keep-alive'
+      register: result
+      failed_when: result.status not in [200, 201]
+
+    - name: Set CMS login token if present
+      set_fact:
+        cms_login_token: "{{ result.json.accessToken }}"
+      when: result.json.accessToken is defined
