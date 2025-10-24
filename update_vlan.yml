@@ -8,7 +8,7 @@
     - block:
         - name: Get vlan info
           uri:
-            url: "http://{{ cms.url }}/cms/config?v=1621877645057"
+            url: "http://{{ cmsurl }}/cms/config?v=1621877645057"
             method: POST
             headers:
               Connection: 'keep-alive'
@@ -44,7 +44,7 @@
         
         - name: Update VLAN details
           uri:
-             url: "http://{{ cms.url }}/cms/networkmap?v=1620732259069"
+             url: "http://{{ cmsurl }}/cms/networkmap?v=1620732259069"
              method: POST
              headers:
                Connection: 'keep-alive'
