@@ -4,9 +4,6 @@
   become_method: sudo
   gather_facts: false
 
-  vars:
-    cmsurl: "http://your.cms.server.address"  # <-- Set your CMS URL here
-
   tasks:
     - name: CHASSISINFO_GETALL
       uri:
