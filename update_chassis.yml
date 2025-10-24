@@ -4,7 +4,7 @@
   become_method: sudo
   gather_facts: false
 
-  tasks:
+- block:
     - name: CHASSISINFO_GETALL
       uri:
         url: "http://{{ cmsurl }}/cms/config?v=1620913452992"
@@ -71,3 +71,4 @@
       lineinfile:
         path: "{{ status_file }}"
         line: "update_chassis"
+  when: "'update_chassis' not in status_check_list"
