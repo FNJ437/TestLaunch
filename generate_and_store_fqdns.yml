@@ -1,0 +1,62 @@
+---
+- hosts: all
+  become: yes
+  become_method: sudo
+  gather_facts: false
+
+  tasks:
+    - block:
+        - name: Get networkmap details
+          include_tasks: get_networkmap_details.yml
+        
+        - set_fact:
+            no_log: true
+            resp: "{{ get_networkmap | json_query('json.dgInfo')|to_json|from_json }}"
+        
+        - name: Extracting POC Servers
+          set_fact:
+            poc_servers: >
+              {% for server in get_networkmap.json.dgInfo %}{% if server.CARDTYPE == 32 or server.CARDTYPE == 33 %}{{server}},{% endif %}{% endfor %}
+        
+        - debug: var=poc_servers
+        
+        - name: Generate fqdns
+          set_fact:
+            fqdn: |
+              {% for item in poc_servers %}
+              {% if item.cardDetails %}
+              {{item.DGNAME|lower~wildcard}}
+              {% endif %}
+              {% endfor %}
+              {% for item in poc_servers %}
+              {{item.DGNAME|lower~'g'~wildcard}}
+              {% endfor %}
+              {% for item in poc_servers %}
+              {{item.DGNAME|lower~'ntfy'~wildcard}}
+              {% endfor %}
+              {% for item in poc_servers %}
+              {{item.DGNAME|lower~'gntfy'~wildcard}}
+              {% endfor %}
+              {{'wms'~wildcard}}
+              {{'wds'~wildcard}}
+              {{'kms'~wildcard}}
+              {{'rls'~wildcard}}
+              {{'cms'~wildcard}}
+              #{{'syncgw'~wildcard}}
+              #{{'syncloc'~wildcard}}
+        
+        
+        - name: Printing the FQDNs
+          debug: var=fqdn
+        
+        - name: Writing the output to the variable file
+          copy:
+            content: "{{fqdn}}"
+            dest: /DGlogs/fqdns.txt
+        
+        - name: update the task in status file
+          lineinfile:
+              path: "{{status_file}}"
+              line: "generate_and_store_fqdns"
+        
+      when: "'generate_and_store_fqdns' not in status_check_list"
