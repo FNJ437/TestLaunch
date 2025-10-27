@@ -1,0 +1,179 @@
+---
+- hosts: all
+  become: yes
+  become_method: sudo
+  gather_facts: false
+
+  tasks:
+    - block:
+        - name: Get networkmap
+          uri:
+            url: "http://{{ cms.url }}/cms/networkmap?v=1633605424448"
+            method: POST
+            headers:
+              Connection: 'keep-alive'
+              Authorization: 'Bearer {{ result.json.accessToken }} '
+              Accept: 'application/json, text/plain, */*'
+            validate_certs: no
+            body: {"context":"networkmap","action":"networkmap"}
+            body_format: json
+          register: networkmap
+          failed_when: networkmap.status not in [200, 201]
+        
+        # --------------------------- WCSR -----------------------------------
+        
+        - name: Extracting WCSR servers
+          set_fact:
+            servers: >
+              {% for server in networkmap.json.dgInfo %}{% if server.CARDTYPE == 63 %}{{server}},{% endif %}{% endfor %}
+        
+        - name: Setting data for WCSR
+          set_fact:
+            data: >
+              {% for item in servers %}{"context":"MICROSVC_CONFIG","action":"MICROSVC_CONFIG_UPDATE","actionObject":{{ [{"PARAMNAME":"ACCESS_CONTROL_ALLOW_ORIGIN","PARAMVALUE": "wms"~wildcard },{"PARAMNAME":"CSP","PARAMVALUE": "wms"~wildcard }] }},"object":{"dgId": "{{ item.DGID }}" }},{% endfor %}
+        
+        - name: Sending Update request for WCSR
+          uri:
+            url: "http://{{ cms.url }}/cms/config?v=634844190505"
+            headers:
+              Connection: keep-alive
+              Authorization: "Bearer {{result.json.accessToken}}"
+              Accept: "application/json, text/plain, */*"
+            method: POST
+            body: "{{item}}"
+            body_format: json
+            return_content: yes
+            timeout: 120
+          loop: "{{data}}"
+          register: response
+          failed_when: response.json.code | int not in [200, 201]
+        
+        # --------------------------- CAT -----------------------------------
+        
+        - name: Extracting CAT servers
+          set_fact:
+            servers: >
+              {% for server in networkmap.json.dgInfo %}{% if server.CARDTYPE == 61 %}{{server}},{% endif %}{% endfor %}
+        
+        - name: Setting data for CAT
+          set_fact:
+            data: >
+              {% for item in servers%}{"context":"MICROSVC_CONFIG","action":"MICROSVC_CONFIG_UPDATE","actionObject":[{"PARAMNAME":"SSO_SCHEME","PARAMVALUE":"{{ cat_micro_svc_config['SSO_SCHEME'] }}" }],"object":{"dgId":"{{item.DGID}}"}},{% endfor %}
+        
+        - name: Sending Update request for CAT
+          uri:
+            url: "http://{{ cms.url }}/cms/config?v=634844190505"
+            headers:
+              Connection: keep-alive
+              Authorization: "Bearer {{result.json.accessToken}}"
+              Accept: "application/json, text/plain, */*"
+            method: POST
+            body: "{{item}}"
+            body_format: json
+            return_content: yes
+            timeout: 120
+          loop: "{{data}}"
+          register: response
+          failed_when: response.json.code | int not in [200, 201]
+        
+        # --------------------------- SYNCGW -----------------------------------
+        
+        #- name: Extracting SYNCGW servers
+        #  set_fact:
+        #    CORS_ORIGIN_WEB_DISPATCHER: '{{"https://wds"~wildcard~",https://wms"~wildcard}}'
+        #    servers: >
+        #      {% for server in networkmap.json.dgInfo %}{% if server.CARDTYPE == 105 %}{{server}},{% endif %}{% endfor %}
+        
+        #- name: Setting data for SYNCGW
+        #  set_fact:
+        #    data: >
+        #      {% for item in servers %}{"context":"MICROSVC_CONFIG","action":"MICROSVC_CONFIG_UPDATE","actionObject":{{[{"PARAMNAME":"CORS_HEADERS","PARAMVALUE":syncgw_micro_svc_config["CORS_HEADERS"]},{"PARAMNAME":"CORS_ORIGIN_WEBDISPATCHER","PARAMVALUE":CORS_ORIGIN_WEB_DISPATCHER}]}},"object":{"dgId":"{{item.DGID}}"}},{% endfor %}
+        
+        #- name: Sending Update request for SYNCGW
+        #  uri:
+        #    url: "http://{{ cms.url }}/cms/config?v=634844190505"
+        #    headers:
+        #      Connection: keep-alive
+        #      Authorization: "Bearer {{result.json.accessToken}}"
+        #      Accept: "application/json, text/plain, */*"
+        #    method: POST
+        #    body: "{{item}}"
+        #    body_format: json
+        #    return_content: yes
+        #    timeout: 120
+        #  loop: "{{data}}"
+        #  register: response
+        
+        # --------------------------- KPNS -----------------------------------
+        
+        - name: Extracting KPNS servers
+          set_fact:
+            servers: >
+              {% for server in networkmap.json.dgInfo %}{% if server.CARDTYPE == 54 %}{{server}},{% endif %}{% endfor %}
+        
+        - name: Setting data KPNS
+          set_fact:
+            data: >
+              {% for item in servers %}{"context":"MICROSVC_CONFIG","action":"MICROSVC_CONFIG_UPDATE","actionObject":{{[{"PARAMNAME":"GCM_SENDER_ID","PARAMVALUE":global_micro_common_config[0]["GCM_SENDER_ID"]},{"PARAMNAME":"GCM_SERVER_API_KEY","PARAMVALUE":global_micro_common_config[0]["GCM_SERVER_API_KEY"]},{"PARAMNAME":"GCM_XMPP_FQDN","PARAMVALUE":kpns_micro_svc_config["GCM_XMPP_FQDN"]},]}},"object":{"dgId":"{{item.DGID}}"}},{% endfor %}
+        
+        - name: Sending Update request for KPNS
+          uri:
+            url: "http://{{ cms.url }}/cms/config?v=634844190505"
+            headers:
+              Connection: keep-alive
+              Authorization: "Bearer {{result.json.accessToken}}"
+              Accept: "application/json, text/plain, */*"
+            method: POST
+            body: "{{item}}"
+            body_format: json
+            return_content: yes
+            timeout: 120
+          loop: "{{data}}"
+          register: response
+          failed_when: response.json.code | int not in [200, 201]
+        
+        # --------------------------- IDM -----------------------------------
+        - name: Extracting IDM servers
+          set_fact:
+            OIDCXCAPROOTURI: "{{'wms'~wildcard}}"
+            WDSFQDN: "{{'wds'~wildcard}}"
+            servers: >
+              {% for server in networkmap.json.dgInfo %}{% if server.CARDTYPE == 58 %}{{server}},{% endif %}{% endfor %}
+        
+        - name: Setting variables IDM
+          set_fact:
+            CATUI_LOGIN_MAIL_LINK: 'https://{{ OIDCXCAPROOTURI }}/cat/view/idmlogin'
+            CATUI_PASSWORD_MAIL_LINK: 'https://{{OIDCXCAPROOTURI}}/cat/static/idmui/index.html#/choosePassword'
+            CATUI_VERIFY_MAIL_LINK: 'https://{{OIDCXCAPROOTURI}}/cat/static/idmui/index.html#/emailVerify'
+            WDS_LOGIN_MAIL_LINK: 'https://{{WDSFQDN}}/WebDispatcher/idmui/index.html'
+            WDS_PASSWORD_MAIL_LINK: 'https://{{WDSFQDN}}/WebDispatcher/idmui/index.html#/choosePassword'
+            WDS_VERIFY_MAIL_LINK: 'https://{{WDSFQDN}}/WebDispatcher/idmui/index.html#/emailVerify'
+            WCSR_LOGIN_MAIL_LINK: 'https://{{OIDCXCAPROOTURI}}/csrkodiak/login'
+            WCSR_PASSWORD_MAIL_LINK: 'https://{{OIDCXCAPROOTURI}}/csrkodiak/idmui/index.html#/choosePassword'
+            WCSR_VERIFY_MAIL_LINK: 'https://{{OIDCXCAPROOTURI}}/csrkodiak/idmui/index.html#/emailVerify'
+        
+        - name: Setting data IDM
+          set_fact:
+            data: >
+              {% for item in servers %}{"context":"MICROSVC_CONFIG","action":"MICROSVC_CONFIG_UPDATE","actionObject":[{"PARAMNAME":"CATUI_LOGIN_MAIL_LINK","PARAMVALUE": "{{CATUI_LOGIN_MAIL_LINK}}",},{"PARAMNAME":"CATUI_PASSWORD_MAIL_LINK","PARAMVALUE": "{{CATUI_PASSWORD_MAIL_LINK}}", },{"PARAMNAME":"CATUI_VERIFY_MAIL_LINK","PARAMVALUE": "{{CATUI_VERIFY_MAIL_LINK}}", },{"PARAMNAME":"WDS_LOGIN_MAIL_LINK","PARAMVALUE": "{{WDS_LOGIN_MAIL_LINK}}", },{"PARAMNAME":"WDS_PASSWORD_MAIL_LINK","PARAMVALUE": "{{WDS_PASSWORD_MAIL_LINK}}", },{"PARAMNAME":"WDS_VERIFY_MAIL_LINK","PARAMVALUE": "{{WDS_VERIFY_MAIL_LINK}}", },{"PARAMNAME":"WDS_WELCOME_MAIL_ENABLED","PARAMVALUE":"{{idm_micro_svc_config['WDS_WELCOME_MAIL_ENABLED']}}",},{"PARAMNAME":"IDM_IDAAS_ID_TYPE","PARAMVALUE":"{{idm_micro_svc_config['IDM_IDAAS_ID_TYPE']}}",},{"PARAMNAME":"WCSR_LOGIN_MAIL_LINK","PARAMVALUE": "{{WCSR_LOGIN_MAIL_LINK}}", },{"PARAMNAME":"WCSR_PASSWORD_MAIL_LINK","PARAMVALUE": "{{WCSR_PASSWORD_MAIL_LINK}}", },{"PARAMNAME":"WCSR_VERIFY_MAIL_LINK","PARAMVALUE": "{{WCSR_VERIFY_MAIL_LINK}}",},{"PARAMNAME":"SMTP_EMAIL_ACCOUNT_ID","PARAMVALUE": "{{idm_micro_svc_config['SMTP_EMAIL_ACCOUNT_ID']}}",},{"PARAMNAME":"SMTP_ENABLEAUTHENTICATION","PARAMVALUE": "{{idm_micro_svc_config['SMTP_ENABLEAUTHENTICATION']}}",},{"PARAMNAME":"SMTP_HOST","PARAMVALUE": "{{idm_micro_svc_config['SMTP_HOST']}}",},{"PARAMNAME":"SMTP_PASSWORD","PARAMVALUE": "{{idm_micro_svc_config['SMTP_PASSWORD']}}",},{"PARAMNAME":"SMTP_PORT","PARAMVALUE": "{{idm_micro_svc_config['SMTP_PORT']}}",},{"PARAMNAME":"SMTP_TRANSPORT_TYPE","PARAMVALUE": "{{idm_micro_svc_config['SMTP_TRANSPORT_TYPE']}}",},{"PARAMNAME":"SMTP_USERNAME","PARAMVALUE": "{{idm_micro_svc_config['SMTP_USERNAME']}}",},],"object": {"dgId":"{{ item.DGID }}",},},{% endfor %}
+        
+        - name: Sending Update request for IDM service
+          uri:
+            url: "http://{{ cms.url }}/cms/config?v=634844190505"
+            headers:
+              Connection: keep-alive
+              Authorization: "Bearer {{result.json.accessToken}}"
+              Accept: "application/json, text/plain, */*"
+            method: POST
+            body: "{{item}}"
+            body_format: json
+            return_content: yes
+          loop: "{{data}}"
+          register: response
+          failed_when: response.json.code | int not in [200, 201]
+        
+        - name: update the task in status file
+          lineinfile:
+              path: "{{status_file}}"
+              line: "micro_svc_configuration"
+      when: "'micro_svc_configuration' not in status_check_list"
