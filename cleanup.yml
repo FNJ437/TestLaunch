@@ -1,5 +1,11 @@
 ---
-- name: remove success file After all the tasks are executed successfully
-  file:
-     path: "{{status_file}}"
-     state: absent
+- hosts: all
+  become: yes
+  become_method: sudo
+  gather_facts: false
+
+  tasks:
+    - name: remove success file After all the tasks are executed successfully
+      file:
+         path: "{{status_file}}"
+         state: absent
