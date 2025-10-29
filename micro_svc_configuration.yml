@@ -10,7 +10,7 @@
 
     - name: Get networkmap
       uri:
-        url: "http://{{ cms.url }}/cms/networkmap?v=1633605424448"
+        url: "http://{{ cmsurl }}/cms/networkmap?v=1633605424448"
         method: POST
         headers:
           Connection: 'keep-alive'
@@ -36,7 +36,7 @@
     
     - name: Sending Update request for WCSR
       uri:
-        url: "http://{{ cms.url }}/cms/config?v=634844190505"
+        url: "http://{{ cmsurl }}/cms/config?v=634844190505"
         headers:
           Connection: keep-alive
           Authorization: "Bearer {{cms_login_token}}"
@@ -64,7 +64,7 @@
     
     - name: Sending Update request for CAT
       uri:
-        url: "http://{{ cms.url }}/cms/config?v=634844190505"
+        url: "http://{{ cmsurl }}/cms/config?v=634844190505"
         headers:
           Connection: keep-alive
           Authorization: "Bearer {{cms_login_token}}"
@@ -93,7 +93,7 @@
     
     #- name: Sending Update request for SYNCGW
     #  uri:
-    #    url: "http://{{ cms.url }}/cms/config?v=634844190505"
+    #    url: "http://{{ cmsurl }}/cms/config?v=634844190505"
     #    headers:
     #      Connection: keep-alive
     #      Authorization: "Bearer {{cms_login_token}}"
@@ -120,7 +120,7 @@
     
     - name: Sending Update request for KPNS
       uri:
-        url: "http://{{ cms.url }}/cms/config?v=634844190505"
+        url: "http://{{ cmsurl }}/cms/config?v=634844190505"
         headers:
           Connection: keep-alive
           Authorization: "Bearer {{cms_login_token}}"
@@ -161,7 +161,7 @@
     
     - name: Sending Update request for IDM service
       uri:
-        url: "http://{{ cms.url }}/cms/config?v=634844190505"
+        url: "http://{{ cmsurl }}/cms/config?v=634844190505"
         headers:
           Connection: keep-alive
           Authorization: "Bearer {{cms_login_token}}"
