@@ -124,5 +124,4 @@
           lineinfile:
               path: "{{status_file}}"
               line: "configure_subspartitioning"
-	  
       when: "'configure_subspartitioning' not in status_check_list"
