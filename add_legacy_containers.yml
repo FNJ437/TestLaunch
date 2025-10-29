@@ -5,64 +5,64 @@
   gather_facts: false
 
   tasks:
-    - block:
-        - name: Generate legacy container add API request
-          set_fact:
-            cont_list: >
-              {"context":"MANAGEDOBJECTS_NODE","action":"MANAGEDOBJECTS_NODE_ADD","actionObject":{"dgInfo":[
-                {%- for item in legacy %}
-                  {% for c in item.containers %}
-                    {% if c.sigcardid not in ( '110','38','39','32','33') %}
-                      {"cardDetails":[{"SIGNALINGCARD_NAME":"{{ c.name }}","CHASSISID":"{{ item.chassisid }}","IPADDRESS":"{{ c.interface[0].ip }}","CLUSTERID":"{{ item.clusterid }}","HOSTNAME":"{{ c.name }}","NODETYPE":{% if c.sigcardid == "101" or c.sigcardid == "102" %}1{% else %}{{c.nodetype }}{% endif %},{% if (c.sigcardid == "32") and (c.nodetype == 1) %}"MAXSUBSCRIBERSRANGE":"10000"{% endif %}},],"DGID":"{{ c.dgid }}","DGNAME":"{% if c.sigcardid == '101' or c.sigcardid == '102' %}{{ c.name }}{% else %}{{ c.cardtype}}{% endif %}","CARDTYPE":"{{ c.sigcardid }}"},
-                    {% endif %}
-                  {% endfor %}
-                {% endfor -%}
-              ]}}
-        
-        - name: Generate legacy container add API request
-          set_fact:
-            sec_geo_poc_cont_list: >
-              [
-                {%- for type in [1,2,3] %}
-                  {% for item in legacy %}
-                    {% for c in item.containers %}
-                      {% if c.sigcardid in( '32', '33' ) and c.nodetype == type %}
-                        {"cardDetails":[{"SIGNALINGCARD_NAME":"{{ c.name }}","CHASSISID":"{{ item.chassisid }}","IPADDRESS":"{{ c.interface[0].ip }}","CLUSTERID":"{{ item.clusterid }}","HOSTNAME":"{{ c.name }}","NODETYPE":{% if c.sigcardid == "101" or c.sigcardid == "102" %}1{% else %}{{c.nodetype }}{% endif %},{% if (c.sigcardid == "32") and (c.nodetype == 1) %}"MAXSUBSCRIBERSRANGE":"10000"{% endif %}},],"DGID":"{{ c.dgid }}","DGNAME":"{% if c.sigcardid == '101' or c.sigcardid == '102' %}{{ c.name }}{% else %}{{ c.cardtype}}{% endif %}","CARDTYPE":"{{ c.sigcardid }}"},
-                      {% endif %}
-                    {% endfor %}
-                  {% endfor %}
-                {% endfor -%}
-        
-              ]
-        
-        - set_fact:
-            cont_list: "{{ cont_list | combine({'actionObject': {'dgInfo': (cont_list['actionObject']['dgInfo'] + sec_geo_poc_cont_list)}}) }}"
-            #cont_list: "{{cont_list['actionObject']['dgInfo'].extend(sec_geo_poc_cont_list)}}"
-        
-        - debug:
-            msg: "{{ cont_list }}"
-        
-        - name: MANAGEOBJECTS_NODE_ADD
-          uri:
-            url: "http://{{ cmsurl }}/cms/config?v=1618385170120"
-            method: POST
-            headers:
-              Connection: 'keep-alive'
-              Authorization: 'Bearer {{ cms_login_token }} '
-              Accept: 'application/json, text/plain, */*'
-            validate_certs: no
-            body: '{{ cont_list }}'
-            timeout: 1200
-            body_format: json
-          register: create_container
-          failed_when: create_container.json.code | int not in [200, 201]
-        
-        - debug:
-            msg: "{{ create_container }}"
-        
-        - name: update the task in status file
-          lineinfile:
-              path: "{{status_file}}"
-              line: "add_legacy_containers"
+    - import_role:
+	    name: checkjob
 
-      when: "'add_legacy_containers' not in status_check_list"
+    - name: Generate legacy container add API request
+      set_fact:
+        cont_list: >
+          {"context":"MANAGEDOBJECTS_NODE","action":"MANAGEDOBJECTS_NODE_ADD","actionObject":{"dgInfo":[
+            {%- for item in legacy %}
+              {% for c in item.containers %}
+                {% if c.sigcardid not in ( '110','38','39','32','33') %}
+                  {"cardDetails":[{"SIGNALINGCARD_NAME":"{{ c.name }}","CHASSISID":"{{ item.chassisid }}","IPADDRESS":"{{ c.interface[0].ip }}","CLUSTERID":"{{ item.clusterid }}","HOSTNAME":"{{ c.name }}","NODETYPE":{% if c.sigcardid == "101" or c.sigcardid == "102" %}1{% else %}{{c.nodetype }}{% endif %},{% if (c.sigcardid == "32") and (c.nodetype == 1) %}"MAXSUBSCRIBERSRANGE":"10000"{% endif %}},],"DGID":"{{ c.dgid }}","DGNAME":"{% if c.sigcardid == '101' or c.sigcardid == '102' %}{{ c.name }}{% else %}{{ c.cardtype}}{% endif %}","CARDTYPE":"{{ c.sigcardid }}"},
+                {% endif %}
+              {% endfor %}
+            {% endfor -%}
+          ]}}
+
+    - name: Generate legacy container add API request
+      set_fact:
+        sec_geo_poc_cont_list: >
+          [
+            {%- for type in [1,2,3] %}
+              {% for item in legacy %}
+                {% for c in item.containers %}
+                  {% if c.sigcardid in( '32', '33' ) and c.nodetype == type %}
+                    {"cardDetails":[{"SIGNALINGCARD_NAME":"{{ c.name }}","CHASSISID":"{{ item.chassisid }}","IPADDRESS":"{{ c.interface[0].ip }}","CLUSTERID":"{{ item.clusterid }}","HOSTNAME":"{{ c.name }}","NODETYPE":{% if c.sigcardid == "101" or c.sigcardid == "102" %}1{% else %}{{c.nodetype }}{% endif %},{% if (c.sigcardid == "32") and (c.nodetype == 1) %}"MAXSUBSCRIBERSRANGE":"10000"{% endif %}},],"DGID":"{{ c.dgid }}","DGNAME":"{% if c.sigcardid == '101' or c.sigcardid == '102' %}{{ c.name }}{% else %}{{ c.cardtype}}{% endif %}","CARDTYPE":"{{ c.sigcardid }}"},
+                  {% endif %}
+                {% endfor %}
+              {% endfor %}
+            {% endfor -%}
+
+          ]
+
+    - set_fact:
+        cont_list: "{{ cont_list | combine({'actionObject': {'dgInfo': (cont_list['actionObject']['dgInfo'] + sec_geo_poc_cont_list)}}) }}"
+        #cont_list: "{{cont_list['actionObject']['dgInfo'].extend(sec_geo_poc_cont_list)}}"
+
+    - debug:
+        msg: "{{ cont_list }}"
+
+    - name: MANAGEOBJECTS_NODE_ADD
+      uri:
+        url: "http://{{ cmsurl }}/cms/config?v=1618385170120"
+        method: POST
+        headers:
+          Connection: 'keep-alive'
+          Authorization: 'Bearer {{ cms_login_token }} '
+          Accept: 'application/json, text/plain, */*'
+        validate_certs: no
+        body: '{{ cont_list }}'
+        timeout: 1200
+        body_format: json
+      register: create_container
+      failed_when: create_container.json.code | int not in [200, 201]
+
+    - debug:
+        msg: "{{ create_container }}"
+
+    - name: update the task in status file
+      lineinfile:
+          path: "{{status_file}}"
+          line: "add_legacy_containers"
