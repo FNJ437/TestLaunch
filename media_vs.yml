@@ -13,7 +13,7 @@
             method: POST
             headers:
               Connection: 'keep-alive'
-              Authorization: 'Bearer {{ result.json.accessToken }} '
+              Authorization: 'Bearer {{ cms_login_token }} '
               Accept: 'application/json, text/plain, */*'
             validate_certs: no
             body: {"context":"networkmap","action":"networkmap"}
