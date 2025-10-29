@@ -12,7 +12,7 @@
             method: POST
             headers:
               Connection: 'keep-alive'
-              Authorization: 'Bearer {{ result.json.accessToken }} '
+              Authorization: 'Bearer {{ cms_login_token }} '
               Accept: 'application/json, text/plain, */*'
             validate_certs: no
             body: {"context":"networkmap","action":"networkmap"}
@@ -34,7 +34,7 @@
             url: "http://{{cmsurl}}/cms/config?v=1634836651203"
             headers:
               Connection: keep-alive
-              Authorization: "Bearer {{result.json.accessToken}}"
+              Authorization: "Bearer {{cms_login_token}}"
               Accept: "appication/json, text/plain, */*"
             method: POST
             body: '{"context":"POC_SVC_CONFIG","action":"POC_SVC_CONFIG_GET","object":{"dgId":"{{ item.DGID }}"}}'
@@ -54,7 +54,7 @@
             url: "http://{{cmsurl}}/cms/config?v=634844190505"
             headers:
               Connection: keep-alive
-              Authorization: "Bearer {{result.json.accessToken}}"
+              Authorization: "Bearer {{cms_login_token}}"
               Accept: "application/json, text/plain, */*"
             method: POST
             body: "{{item}}"
@@ -71,7 +71,7 @@
             url: "http://{{cmsurl}}/cms/config?v=1634836651203"
             headers:
               Connection: keep-alive
-              Authorization: "Bearer {{result.json.accessToken}}"
+              Authorization: "Bearer {{cms_login_token}}"
               Accept: "appication/json, text/plain, */*"
             method: POST
             body: '{"context":"POCREGISTRARSRVCCONFIG","action":"POCREGISTRARSRVCCONFIG_GET","object":{"dgId":"{{ item.DGID }}"}}'
@@ -92,7 +92,7 @@
             url: "http://{{cmsurl}}/cms/config?v=634844190505"
             headers:
               Connection: keep-alive
-              Authorization: "Bearer {{result.json.accessToken}}"
+              Authorization: "Bearer {{cms_login_token}}"
               Accept: "application/json, text/plain, */*"
             method: POST
             body: "{{item}}"
@@ -109,7 +109,7 @@
             url: "http://{{cmsurl}}/cms/config?v=1634836651203"
             headers:
               Connection: keep-alive
-              Authorization: "Bearer {{result.json.accessToken}}"
+              Authorization: "Bearer {{cms_login_token}}"
               Accept: "appication/json, text/plain, */*"
             method: POST
             body: '{"context":"PRESENCESERVICECONFIG","action":"PRESENCESERVICECONFIG_GET","object":{"dgId":"{{ item.DGID }}"}}'
@@ -129,7 +129,7 @@
             url: "http://{{cmsurl}}/cms/config?v=634844190505"
             headers:
               Connection: keep-alive
-              Authorization: "Bearer {{result.json.accessToken}}"
+              Authorization: "Bearer {{cms_login_token}}"
               Accept: "application/json, text/plain, */*"
             method: POST
             body: "{{item}}"
@@ -147,7 +147,7 @@
             url: "http://{{cmsurl}}/cms/config?v=1634836651203"
             headers:
               Connection: keep-alive
-              Authorization: "Bearer {{result.json.accessToken}}"
+              Authorization: "Bearer {{cms_login_token}}"
               Accept: "appication/json, text/plain, */*"
             method: POST
             body: '{"context":"SIPPROXYSVCCONFIG","action":"SIPPROXYSVCCONFIG_GET","object":{"dgId":"{{ item.DGID }}"}}'
@@ -167,7 +167,7 @@
             url: "http://{{cmsurl}}/cms/config?v=634844190505"
             headers:
               Connection: keep-alive
-              Authorization: "Bearer {{result.json.accessToken}}"
+              Authorization: "Bearer {{cms_login_token}}"
               Accept: "application/json, text/plain, */*"
             method: POST
             body: "{{item}}"
@@ -184,7 +184,7 @@
             url: "http://{{cmsurl}}/cms/config?v=1634836651203"
             headers:
               Connection: keep-alive
-              Authorization: "Bearer {{result.json.accessToken}}"
+              Authorization: "Bearer {{cms_login_token}}"
               Accept: "appication/json, text/plain, */*"
             method: POST
             body: '{"context":"XDMS_DOCSUBPRX_CONFIG","action":"XDMS_DOCSUBPRX_CONFIG_GET","object":{"dgId":"{{ item.DGID }}"}}'
@@ -204,7 +204,7 @@
             url: "http://{{cmsurl}}/cms/config?v=634844190505"
             headers:
               Connection: keep-alive
-              Authorization: "Bearer {{result.json.accessToken}}"
+              Authorization: "Bearer {{cms_login_token}}"
               Accept: "application/json, text/plain, */*"
             method: POST
             body: "{{item}}"
@@ -221,7 +221,7 @@
             url: "http://{{cmsurl}}/cms/config?v=1634836651203"
             headers:
               Connection: keep-alive
-              Authorization: "Bearer {{result.json.accessToken}}"
+              Authorization: "Bearer {{cms_login_token}}"
               Accept: "appication/json, text/plain, */*"
             method: POST
             body: '{"context":"LOCATIONSERVICECONFIG","action":"LOCATIONSERVICECONFIG_GET","object":{"dgId":"{{ item.DGID }}"}}'
@@ -241,7 +241,7 @@
             url: "http://{{cmsurl}}/cms/config?v=634844190505"
             headers:
               Connection: keep-alive
-              Authorization: "Bearer {{result.json.accessToken}}"
+              Authorization: "Bearer {{cms_login_token}}"
               Accept: "application/json, text/plain, */*"
             method: POST
             body: "{{item}}"
@@ -259,7 +259,7 @@
             url: "http://{{cmsurl}}/cms/config?v=1634836651203"
             headers:
               Connection: keep-alive
-              Authorization: "Bearer {{result.json.accessToken}}"
+              Authorization: "Bearer {{cms_login_token}}"
               Accept: "appication/json, text/plain, */*"
             method: POST
             body: '{"context":"RTXENVVARIABLEINFO","action":"RTXENVVARIABLEINFO_GETALL","object":{"dgId":"{{ item.DGID }}"}}'
@@ -279,7 +279,7 @@
             url: "http://{{cmsurl}}/cms/config?v=634844190505"
             headers:
               Connection: keep-alive
-              Authorization: "Bearer {{result.json.accessToken}}"
+              Authorization: "Bearer {{cms_login_token}}"
               Accept: "application/json, text/plain, */*"
             method: POST
             body: "{{item}}"
@@ -297,7 +297,7 @@
             url: "http://{{cmsurl}}/cms/config?v=1634836651203"
             headers:
               Connection: keep-alive
-              Authorization: "Bearer {{result.json.accessToken}}"
+              Authorization: "Bearer {{cms_login_token}}"
               Accept: "appication/json, text/plain, */*"
             method: POST
             body: '{"context":"SC_POCSIPEVENTHNDLR","action":"SC_POCSIPEVENTHNDLR_GETALL","object":{"dgId":"{{ item.DGID }}"}}'
@@ -317,7 +317,7 @@
             url: "http://{{cmsurl}}/cms/config?v=634844190505"
             headers:
               Connection: keep-alive
-              Authorization: "Bearer {{result.json.accessToken}}"
+              Authorization: "Bearer {{cms_login_token}}"
               Accept: "application/json, text/plain, */*"
             method: POST
             body: "{{item}}"
@@ -334,7 +334,7 @@
             url: "http://{{cmsurl}}/cms/config?v=1634836651203"
             headers:
               Connection: keep-alive
-              Authorization: "Bearer {{result.json.accessToken}}"
+              Authorization: "Bearer {{cms_login_token}}"
               Accept: "appication/json, text/plain, */*"
             method: POST
             body: '{"context":"BP_CONFIG","action":"BP_CONFIG_GET","object":{"dgId":"{{ item.DGID }}"}}'
@@ -354,7 +354,7 @@
             url: "http://{{cmsurl}}/cms/config?v=634844190505"
             headers:
               Connection: keep-alive
-              Authorization: "Bearer {{result.json.accessToken}}"
+              Authorization: "Bearer {{cms_login_token}}"
               Accept: "application/json, text/plain, */*"
             method: POST
             body: "{{item}}"
@@ -379,7 +379,7 @@
             url: "http://{{cmsurl}}/cms/config?v=1635768644379"
             headers:
               Connection: keep-alive
-              Authorization: "Bearer {{result.json.accessToken}}"
+              Authorization: "Bearer {{cms_login_token}}"
               Accept: "appication/json, text/plain, */*"
             method: POST
             body: '{"context":"XDMS_SVC_CONFIG","action":"XDMS_SVC_CONFIG_GET","object":{"dgId":"{{item.DGID}}"}}'
@@ -399,7 +399,7 @@
             url: "http://{{cmsurl}}/cms/config?v=634844190505"
             headers:
               Connection: keep-alive
-              Authorization: "Bearer {{result.json.accessToken}}"
+              Authorization: "Bearer {{cms_login_token}}"
               Accept: "application/json, text/plain, */*"
             method: POST
             body: "{{item}}"
@@ -416,7 +416,7 @@
             url: "http://{{cmsurl}}/cms/config?v=1634836651203"
             headers:
               Connection: keep-alive
-              Authorization: "Bearer {{result.json.accessToken}}"
+              Authorization: "Bearer {{cms_login_token}}"
               Accept: "appication/json, text/plain, */*"
             method: POST
             body: '{"context":"SOFTWAREPKGINSTALLINFO","action":"SOFTWAREPKGINSTALLINFO_GETALL","object":{"dgId":"{{ item.DGID }}"}}'
@@ -436,7 +436,7 @@
             url: "http://{{cmsurl}}/cms/config?v=634844190505"
             headers:
               Connection: keep-alive
-              Authorization: "Bearer {{result.json.accessToken}}"
+              Authorization: "Bearer {{cms_login_token}}"
               Accept: "application/json, text/plain, */*"
             method: POST
             body: "{{item}}"
@@ -454,7 +454,7 @@
             url: "http://{{cmsurl}}/cms/config?v=1634836651203"
             headers:
               Connection: keep-alive
-              Authorization: "Bearer {{result.json.accessToken}}"
+              Authorization: "Bearer {{cms_login_token}}"
               Accept: "appication/json, text/plain, */*"
             method: POST
             body: '{"context":"RTXENVVARIABLEINFO","action":"RTXENVVARIABLEINFO_GETALL","object":{"dgId":"{{ item.DGID }}"}}'
@@ -475,7 +475,7 @@
             url: "http://{{cmsurl}}/cms/config?v=634844190505"
             headers:
               Connection: keep-alive
-              Authorization: "Bearer {{result.json.accessToken}}"
+              Authorization: "Bearer {{cms_login_token}}"
               Accept: "application/json, text/plain, */*"
             method: POST
             body: "{{item}}"
