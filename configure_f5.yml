@@ -6,7 +6,7 @@
 
   tasks:
     - import_role:
-        name: checkjb
+        name: checkjob
 
     - name: Looping and creating body for adding servers
       set_fact:
