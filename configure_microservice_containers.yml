@@ -5,117 +5,112 @@
   gather_facts: false
 
   tasks:
-    - block:
-        - set_fact:
-            primary_route: "{{ chassis_list[0].route }}"
-        
-        - name: Populate microservice network detail
-          set_fact:
-            g_route: >
-                   {% for item in chassis_list if (item.clusterid == 2 ) %}
-                           {{ item.route }}
-                   {% endfor %}
-          when: ( deployment_type == 2 ) or ( deployment_type == 3 )
-        
-        - set_fact:
-            geo_route: "{{ g_route | trim | replace('\n', '')}}"
-          when: ( deployment_type == 2 ) or ( deployment_type == 3 )
-        
-        - name: Get the list of microservice containers
-          uri:
-             url: "http://{{ cmsurl }}/cms/networkmap?v=1620732259069"
-             method: POST
-             headers:
-               Connection: 'keep-alive'
-               Authorization: 'Bearer {{ cms_login_token }} '
-               Accept: 'application/json, text/plain, */*'
-             validate_certs: no
-             timeout: 420
-             body: '{"context":"MICROSVC_CONTAINERCONFIG","action":"MICROSVC_CONTAINERCONFIG_GETALL","object":{"dgId":""}}'
-             body_format: json
-          register: container_add
-          failed_when: container_add.status not in [200, 201]
-        
-        - name: Filter microservice containers list
-          set_fact:
-              doc1: "{{ container_add |to_json| from_json | json_query('json.data.values[]') }}"
-        
-        
-        - name: Container configure request
-          set_fact:
-            container_add: >
-               {"context":"MICROSVC_CONTAINERCONFIG","action":"MICROSVC_CONTAINERCONFIG_CONFIGURE","actionObject":[
-                {% for item in doc1 %}
-                     {% for img_name in microservices if ( img_name.clusterid == item.CLUSTERID ) %}
-                     {% for i in img_name.containers | unique | select | list %}
-                     {% if i.name == item.SERVICETYPE  %}
-                         {"CONTAINER_SIGCARDID":{{item.CONTAINER_SIGCARDID}},"IPADDRESS":"{{ item.IPADDRESS }}","SIGNALINGCARDTYPE":{{ item.SIGNALINGCARDTYPE }},"STATUS":0,"IMAGE":"{{ i.image }}","ROUTES":{% if item.CLUSTERID == 1 %} "{{ primary_route }}" {% elif item.CLUSTERID == 2 %} "{{ geo_route }}" {% endif %} ,"INTERFACE":null,"SERVICETYPE":"{{ item.SERVICETYPE }}","SIGNALINGCARD_NAME":"{{ item.SIGNALINGCARD_NAME }}","PTTSERVERID":"{{ item.PTTSERVERID }}","CPU_SET_CPUS": null,"SYNCGWREP_SYNCGWFUNC_FLAG":0},
-                     {% endif %}
-                     {% endfor %}
-                     {% endfor %}
-                {% endfor %}
-                ]}
-          when: ( deployment_type == 2 ) or ( deployment_type == 3 )
-        
-        - set_fact:
-            container_add: >
-              {"context":"MICROSVC_CONTAINERCONFIG","action":"MICROSVC_CONTAINERCONFIG_CONFIGURE","actionObject": {{container_add.actionObject|unique}}}
-          when: ( deployment_type == 2 ) or ( deployment_type == 3 )
-        
-        - name: updating IS_HADOOP_NAMENODE param for hadoop nodes
-          set_fact:
-            container_add: >
-              {"context":"MICROSVC_CONTAINERCONFIG","action":"MICROSVC_CONTAINERCONFIG_CONFIGURE","actionObject":[
-               {% set ns = namespace(hadoop_count_pri=1, hadoop_count_geo=1) %}
-               {% for item in container_add.actionObject %}
-               {% if item.SIGNALINGCARDTYPE | int == 114  %}
-                 {% if item.ROUTES == primary_route %}
-                    {% if ns.hadoop_count_pri == 1 %}
-                      {{item | combine ({ "IS_HADOOP_NAMENODE": "true" })}},
-                      {% set ns.hadoop_count_pri = 0 %}
-                    {% elif ns.hadoop_count_pri == 0 %}
-                      {{item | combine ({ "IS_HADOOP_NAMENODE": "false" })}},
-                      {% set ns.hadoop_count_pri = 1 %}
-                    {% endif %}
-                 {% elif item.ROUTES == geo_route %}
-                    {% if ns.hadoop_count_geo == 1 %}
-                      {{item | combine ({ "IS_HADOOP_NAMENODE": "true" })}},
-                      {% set ns.hadoop_count_geo = 0 %}
-                    {% elif ns.hadoop_count_geo == 0 %}
-                      {{item | combine ({ "IS_HADOOP_NAMENODE": "false" })}},
-                      {% set ns.hadoop_count_geo = 1 %}
-                    {% endif %}
-                  {% endif  %}
-               {% else %}
-                  {{item}},
-               {% endif %}
+    - import_role:
+        name: checkjob
+
+    - set_fact:
+        primary_route: "{{ chassis_list[0].route }}"
+    
+    - name: Populate microservice network detail
+      set_fact:
+        g_route: >
+               {% for item in chassis_list if (item.clusterid == 2 ) %}
+                       {{ item.route }}
                {% endfor %}
-              ]}
-          when: ( deployment_type == 2 ) or ( deployment_type == 3 )
-        
-        - name: display container add
-          debug:
-            msg: "{{container_add}}"
-        
-        - name: Add microservice containers
-          uri:
-             url: "http://{{ cmsurl }}/cms/networkmap?v=1620732259069"
-             method: POST
-             headers:
-               Connection: 'keep-alive'
-               Authorization: 'Bearer {{ cms_login_token }} '
-               Accept: 'application/json, text/plain, */*'
-             validate_certs: no
-             timeout: 420
-             body: '{{ container_add }}'
-             body_format: json
-          register: container_configure
-          when: dry_run == 0
-          failed_when: container_configure.json.code | int not in [200, 201]
-        
-        - name: update the task in status file
-          lineinfile:
-              path: "{{status_file}}"
-              line: "configure_microservice_containers"
-                   
-      when: "'configure_microservice_containers' not in status_check_list"
+      when: ( deployment_type == 2 ) or ( deployment_type == 3 )
+    
+    - set_fact:
+        geo_route: "{{ g_route | trim | replace('\n', '')}}"
+      when: ( deployment_type == 2 ) or ( deployment_type == 3 )
+    
+    - name: Get the list of microservice containers
+      uri:
+         url: "http://{{ cmsurl }}/cms/networkmap?v=1620732259069"
+         method: POST
+         headers:
+           Connection: 'keep-alive'
+           Authorization: 'Bearer {{ cms_login_token }} '
+           Accept: 'application/json, text/plain, */*'
+         validate_certs: no
+         timeout: 420
+         body: '{"context":"MICROSVC_CONTAINERCONFIG","action":"MICROSVC_CONTAINERCONFIG_GETALL","object":{"dgId":""}}'
+         body_format: json
+      register: container_add
+      failed_when: container_add.status not in [200, 201]
+    
+    - name: Filter microservice containers list
+      set_fact:
+          doc1: "{{ container_add |to_json| from_json | json_query('json.data.values[]') }}"
+    
+    
+    - name: Container configure request
+      set_fact:
+        container_add: >
+           {"context":"MICROSVC_CONTAINERCONFIG","action":"MICROSVC_CONTAINERCONFIG_CONFIGURE","actionObject":[
+            {% for item in doc1 %}
+                 {% for img_name in microservices if ( img_name.clusterid == item.CLUSTERID ) %}
+                 {% for i in img_name.containers | unique | select | list %}
+                 {% if i.name == item.SERVICETYPE  %}
+                     {"CONTAINER_SIGCARDID":{{item.CONTAINER_SIGCARDID}},"IPADDRESS":"{{ item.IPADDRESS }}","SIGNALINGCARDTYPE":{{ item.SIGNALINGCARDTYPE }},"STATUS":0,"IMAGE":"{{ i.image }}","ROUTES":{% if item.CLUSTERID == 1 %} "{{ primary_route }}" {% elif item.CLUSTERID == 2 %} "{{ geo_route }}" {% endif %} ,"INTERFACE":null,"SERVICETYPE":"{{ item.SERVICETYPE }}","SIGNALINGCARD_NAME":"{{ item.SIGNALINGCARD_NAME }}","PTTSERVERID":"{{ item.PTTSERVERID }}","CPU_SET_CPUS": null,"SYNCGWREP_SYNCGWFUNC_FLAG":0},
+                 {% endif %}
+                 {% endfor %}
+                 {% endfor %}
+            {% endfor %}
+            ]}
+      when: ( deployment_type == 2 ) or ( deployment_type == 3 )
+    
+    - set_fact:
+        container_add: >
+          {"context":"MICROSVC_CONTAINERCONFIG","action":"MICROSVC_CONTAINERCONFIG_CONFIGURE","actionObject": {{container_add.actionObject|unique}}}
+      when: ( deployment_type == 2 ) or ( deployment_type == 3 )
+    
+    - name: updating IS_HADOOP_NAMENODE param for hadoop nodes
+      set_fact:
+        container_add: >
+          {"context":"MICROSVC_CONTAINERCONFIG","action":"MICROSVC_CONTAINERCONFIG_CONFIGURE","actionObject":[
+           {% set ns = namespace(hadoop_count_pri=1, hadoop_count_geo=1) %}
+           {% for item in container_add.actionObject %}
+           {% if item.SIGNALINGCARDTYPE | int == 114  %}
+             {% if item.ROUTES == primary_route %}
+                {% if ns.hadoop_count_pri == 1 %}
+                  {{item | combine ({ "IS_HADOOP_NAMENODE": "true" })}},
+                  {% set ns.hadoop_count_pri = 0 %}
+                {% elif ns.hadoop_count_pri == 0 %}
+                  {{item | combine ({ "IS_HADOOP_NAMENODE": "false" })}},
+                  {% set ns.hadoop_count_pri = 1 %}
+                {% endif %}
+             {% elif item.ROUTES == geo_route %}
+                {% if ns.hadoop_count_geo == 1 %}
+                  {{item | combine ({ "IS_HADOOP_NAMENODE": "true" })}},
+                  {% set ns.hadoop_count_geo = 0 %}
+                {% elif ns.hadoop_count_geo == 0 %}
+                  {{item | combine ({ "IS_HADOOP_NAMENODE": "false" })}},
+                  {% set ns.hadoop_count_geo = 1 %}
+                {% endif %}
+              {% endif  %}
+           {% else %}
+              {{item}},
+           {% endif %}
+           {% endfor %}
+          ]}
+      when: ( deployment_type == 2 ) or ( deployment_type == 3 )
+    
+    - name: display container add
+      debug:
+        msg: "{{container_add}}"
+    
+    - name: Add microservice containers
+      uri:
+         url: "http://{{ cmsurl }}/cms/networkmap?v=1620732259069"
+         method: POST
+         headers:
+           Connection: 'keep-alive'
+           Authorization: 'Bearer {{ cms_login_token }} '
+           Accept: 'application/json, text/plain, */*'
+         validate_certs: no
+         timeout: 420
+         body: '{{ container_add }}'
+         body_format: json
+      register: container_configure
+      when: dry_run == 0
+      failed_when: container_configure.json.code | int not in [200, 201]
