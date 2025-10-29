@@ -1,130 +1,128 @@
+---
 - hosts: all
   become: yes
   become_method: sudo
   gather_facts: false
 
   tasks:
-    - block:
-        - name: Build actionObject list of parameter dicts
-          set_fact:
-            action_object: >-
-              {{
-                [1, 2] | map('extract', {
-                  1:
-                    [
-                      {"PARAMNAME": "ABDGFEATUREFLAG", "PARAMVALUE": micro_common_config['ABDG_FEATURE_FLAG'], "CLUSTERID": 1},
-                      {"PARAMNAME": "AFFILIATION_MONITORING_FLAG", "PARAMVALUE": micro_common_config['AFFILIATION_MONITORING_FLAG'], "CLUSTERID": 1},
-                      {"PARAMNAME": "CATUI_FQDN", "PARAMVALUE": "wms" + wildcard, "CLUSTERID": 1},
-                      {"PARAMNAME": "CORP_HIERARCHY", "PARAMVALUE": micro_common_config['CORP_HIERARCHY'], "CLUSTERID": 1},
-                      {"PARAMNAME": "DEVICE_SHARING_FEATURE_FLAG", "PARAMVALUE": micro_common_config['DEVICE_SHARING_FEATURE_FLAG'], "CLUSTERID": 1},
-                      {"PARAMNAME": "DYNAPI_SERVICE_ENABLED", "PARAMVALUE": micro_common_config['DYNAPI_SERVICE_ENABLED'], "CLUSTERID": 1},
-                      {"PARAMNAME": "GCM_PUSH_NOTIFY", "PARAMVALUE": micro_common_config['GCM_PUSH_NOTIFY'], "CLUSTERID": 1},
-                      {"PARAMNAME": "GEOFENCE_ENABLED", "PARAMVALUE": micro_common_config['GEOFENCE_ENABLED'], "CLUSTERID": 1},
-                      {"PARAMNAME": "GOOGLE_MAPS_API_KEY", "PARAMVALUE": global_micro_common_config[0]['GOOGLE_MAPS_API_KEY'], "CLUSTERID": 1},
-                      {"PARAMNAME": "GRPMEM_LOC_SVC_ENABLED", "PARAMVALUE": micro_common_config['GRPMEM_LOC_SVC_ENABLED'], "CLUSTERID": 1},
-                      {"PARAMNAME": "IDM_SERVICE_FLAG", "PARAMVALUE": micro_common_config['IDM_SERVICE_FLAG'], "CLUSTERID": 1},
-                      {"PARAMNAME": "IDM_WS_FQDN", "PARAMVALUE": "https://wms" + wildcard, "CLUSTERID": 1},
-                      {"PARAMNAME": "KEYCLOAK_EXTFQDN", "PARAMVALUE": "wms" + wildcard, "CLUSTERID": 1},
-                      {"PARAMNAME": "KEYCLOAK_PRIVATE_EXTFQDN", "PARAMVALUE": "wms" + wildcard, "CLUSTERID": 1},
-                      {"PARAMNAME": "KPNS_NOTIFYENSFLAG", "PARAMVALUE": micro_common_config['KPNS_NOTIFYENSFLAG'], "CLUSTERID": 1},
-                      {"PARAMNAME": "LOCATION_SVC_ENABLED", "PARAMVALUE": micro_common_config['LOCATION_SVC_ENABLED'], "CLUSTERID": 1},
-                      {"PARAMNAME": "MOBILESYNCFLAG", "PARAMVALUE": micro_common_config['MOBILESYNCFLAG'], "CLUSTERID": 1},
-                      {"PARAMNAME": "PRESENCE_SVC_ENABLED", "PARAMVALUE": micro_common_config['PRESENCE_SVC_ENABLED'], "CLUSTERID": 1},
-                      {"PARAMNAME": "PTXFEATUREFLAG", "PARAMVALUE": micro_common_config['PTXFEATUREFLAG'], "CLUSTERID": 1},
-                      {"PARAMNAME": "QPPPTXFEATUREFLAG", "PARAMVALUE": micro_common_config['QPPPTXFEATUREFLAG'], "CLUSTERID": 1},
-                      {"PARAMNAME": "RESOURCE_SVR_EXTERNAL_FQDN", "PARAMVALUE": "wms" + wildcard, "CLUSTERID": 1},
-                      {"PARAMNAME": "SGWR_IS_FILTERED_REPLICATION", "PARAMVALUE": micro_common_config['SGWR_IS_FILTERED_REPLICATION'], "CLUSTERID": 1},
-                      {"PARAMNAME": "UPSTREAM_DNS_SERVER_IP", "PARAMVALUE": global_micro_common_config[0]['UPSTREAM_DNS_SERVER_IP'], "CLUSTERID": 1},
-                      {"PARAMNAME": "VOICEMSGFALLBACKFLAG", "PARAMVALUE": micro_common_config['VOICEMSGFALLBACKFLG'], "CLUSTERID": 1},
-                      {"PARAMNAME": "WCSR_FQDN", "PARAMVALUE": "wms" + wildcard, "CLUSTERID": 1},
-                      {"PARAMNAME": "XCAPMOBILESYNCFLAG", "PARAMVALUE": micro_common_config['XCAPMOBILESYNCFLAG'], "CLUSTERID": 1},
-                      {"PARAMNAME": "WDS_EXTFQDN", "PARAMVALUE": "wds" + wildcard, "CLUSTERID": 1},
-                      {"PARAMNAME": "WDS_IDM_WS_FQDN", "PARAMVALUE": "https://wms" + wildcard, "CLUSTERID": 1},
-                      {"PARAMNAME": "WDS_KEYCLOAK_EXTFQDN", "PARAMVALUE": "wms" + wildcard, "CLUSTERID": 1},
-                      {"PARAMNAME": "WDS_RESOURCE_SVR_EXTERNAL_FQDN", "PARAMVALUE": "wms" + wildcard, "CLUSTERID": 1},
-                      {"PARAMNAME": "IS_SYNCGW_INSTALLED", "PARAMVALUE": "0", "CLUSTERID": 1},
-                      {"PARAMNAME": "SSH_TERMINATE_DIALOG_OPT_FLAG", "PARAMVALUE": "1", "CLUSTERID": 1},
-                      {"PARAMNAME": "IDAP_INSTALLED_FLAG", "PARAMVALUE": idap_micro_common_config['IDAP_INSTALLED_FLAG'], "CLUSTERID": 1},
-                      {"PARAMNAME": "IDAP_INSTALL_LIGHT", "PARAMVALUE": idap_micro_common_config['IDAP_INSTALL_LIGHT'], "CLUSTERID": 1},
-                      {"PARAMNAME": "ELASTIC_VERSION", "PARAMVALUE": idap_micro_common_config['ELASTIC_VERSION'], "CLUSTERID": 1},
-                      {"PARAMNAME": "HIVE_HADOOP_VERSION", "PARAMVALUE": idap_micro_common_config['HIVE_HADOOP_VERSION'], "CLUSTERID": 1},
-                      {"PARAMNAME": "PKI_ORGANISATION", "PARAMVALUE": INTERNAL_HOST_DOMAIN, "CLUSTERID": 1},
-                      {"PARAMNAME": "VAULT_TEMP_CERT_FLAG", "PARAMVALUE": "1", "CLUSTERID": 1},
-                      {"PARAMNAME": "POC_SYSTEM_ID", "PARAMVALUE": POC_SYSTEM_ID, "CLUSTERID": 1}
-                    ],
-                  2:
-                    [
-                      {"PARAMNAME": "ABDGFEATUREFLAG", "PARAMVALUE": micro_common_config['ABDG_FEATURE_FLAG'], "CLUSTERID": 2},
-                      {"PARAMNAME": "AFFILIATION_MONITORING_FLAG", "PARAMVALUE": micro_common_config['AFFILIATION_MONITORING_FLAG'], "CLUSTERID": 2},
-                      {"PARAMNAME": "CATUI_FQDN", "PARAMVALUE": "wms" + wildcard, "CLUSTERID": 2},
-                      {"PARAMNAME": "CORP_HIERARCHY", "PARAMVALUE": micro_common_config['CORP_HIERARCHY'], "CLUSTERID": 2},
-                      {"PARAMNAME": "DEVICE_SHARING_FEATURE_FLAG", "PARAMVALUE": micro_common_config['DEVICE_SHARING_FEATURE_FLAG'], "CLUSTERID": 2},
-                      {"PARAMNAME": "DYNAPI_SERVICE_ENABLED", "PARAMVALUE": micro_common_config['DYNAPI_SERVICE_ENABLED'], "CLUSTERID": 2},
-                      {"PARAMNAME": "GCM_PUSH_NOTIFY", "PARAMVALUE": micro_common_config['GCM_PUSH_NOTIFY'], "CLUSTERID": 2},
-                      {"PARAMNAME": "GEOFENCE_ENABLED", "PARAMVALUE": micro_common_config['GEOFENCE_ENABLED'], "CLUSTERID": 2},
-                      {"PARAMNAME": "GOOGLE_MAPS_API_KEY", "PARAMVALUE": global_micro_common_config[0]['GOOGLE_MAPS_API_KEY'], "CLUSTERID": 2},
-                      {"PARAMNAME": "GRPMEM_LOC_SVC_ENABLED", "PARAMVALUE": micro_common_config['GRPMEM_LOC_SVC_ENABLED'], "CLUSTERID": 2},
-                      {"PARAMNAME": "IDM_SERVICE_FLAG", "PARAMVALUE": micro_common_config['IDM_SERVICE_FLAG'], "CLUSTERID": 2},
-                      {"PARAMNAME": "IDM_WS_FQDN", "PARAMVALUE": "https://wms" + wildcard, "CLUSTERID": 2},
-                      {"PARAMNAME": "KEYCLOAK_EXTFQDN", "PARAMVALUE": "wms" + wildcard, "CLUSTERID": 2},
-                      {"PARAMNAME": "KEYCLOAK_PRIVATE_EXTFQDN", "PARAMVALUE": "wms" + wildcard, "CLUSTERID": 2},
-                      {"PARAMNAME": "KPNS_NOTIFYENSFLAG", "PARAMVALUE": micro_common_config['KPNS_NOTIFYENSFLAG'], "CLUSTERID": 2},
-                      {"PARAMNAME": "LOCATION_SVC_ENABLED", "PARAMVALUE": micro_common_config['LOCATION_SVC_ENABLED'], "CLUSTERID": 2},
-                      {"PARAMNAME": "MOBILESYNCFLAG", "PARAMVALUE": micro_common_config['MOBILESYNCFLAG'], "CLUSTERID": 2},
-                      {"PARAMNAME": "PRESENCE_SVC_ENABLED", "PARAMVALUE": micro_common_config['PRESENCE_SVC_ENABLED'], "CLUSTERID": 2},
-                      {"PARAMNAME": "PTXFEATUREFLAG", "PARAMVALUE": micro_common_config['PTXFEATUREFLAG'], "CLUSTERID": 2},
-                      {"PARAMNAME": "QPPPTXFEATUREFLAG", "PARAMVALUE": micro_common_config['QPPPTXFEATUREFLAG'], "CLUSTERID": 2},
-                      {"PARAMNAME": "RESOURCE_SVR_EXTERNAL_FQDN", "PARAMVALUE": "wms" + wildcard, "CLUSTERID": 2},
-                      {"PARAMNAME": "SGWR_IS_FILTERED_REPLICATION", "PARAMVALUE": micro_common_config['SGWR_IS_FILTERED_REPLICATION'], "CLUSTERID": 2},
-                      {"PARAMNAME": "UPSTREAM_DNS_SERVER_IP", "PARAMVALUE": global_micro_common_config[0]['UPSTREAM_DNS_SERVER_IP'], "CLUSTERID": 2},
-                      {"PARAMNAME": "VOICEMSGFALLBACKFLAG", "PARAMVALUE": micro_common_config['VOICEMSGFALLBACKFLG'], "CLUSTERID": 2},
-                      {"PARAMNAME": "WCSR_FQDN", "PARAMVALUE": "wms" + wildcard, "CLUSTERID": 2},
-                      {"PARAMNAME": "XCAPMOBILESYNCFLAG", "PARAMVALUE": micro_common_config['XCAPMOBILESYNCFLAG'], "CLUSTERID": 2},
-                      {"PARAMNAME": "WDS_EXTFQDN", "PARAMVALUE": "wds" + wildcard, "CLUSTERID": 2},
-                      {"PARAMNAME": "WDS_IDM_WS_FQDN", "PARAMVALUE": "https://wms" + wildcard, "CLUSTERID": 2},
-                      {"PARAMNAME": "WDS_KEYCLOAK_EXTFQDN", "PARAMVALUE": "wms" + wildcard, "CLUSTERID": 2},
-                      {"PARAMNAME": "WDS_RESOURCE_SVR_EXTERNAL_FQDN", "PARAMVALUE": "wms" + wildcard, "CLUSTERID": 2},
-                      {"PARAMNAME": "IS_SYNCGW_INSTALLED", "PARAMVALUE": "0", "CLUSTERID": 2},
-                      {"PARAMNAME": "SSH_TERMINATE_DIALOG_OPT_FLAG", "PARAMVALUE": "1", "CLUSTERID": 2},
-                      {"PARAMNAME": "IDAP_INSTALLED_FLAG", "PARAMVALUE": idap_micro_common_config['IDAP_INSTALLED_FLAG'], "CLUSTERID": 2},
-                      {"PARAMNAME": "IDAP_INSTALL_LIGHT", "PARAMVALUE": idap_micro_common_config['IDAP_INSTALL_LIGHT'], "CLUSTERID": 2},
-                      {"PARAMNAME": "ELASTIC_VERSION", "PARAMVALUE": idap_micro_common_config['ELASTIC_VERSION'], "CLUSTERID": 2},
-                      {"PARAMNAME": "HIVE_HADOOP_VERSION", "PARAMVALUE": idap_micro_common_config['HIVE_HADOOP_VERSION'], "CLUSTERID": 2},
-                      {"PARAMNAME": "PKI_ORGANISATION", "PARAMVALUE": INTERNAL_HOST_DOMAIN, "CLUSTERID": 2},
-                      {"PARAMNAME": "VAULT_TEMP_CERT_FLAG", "PARAMVALUE": "1", "CLUSTERID": 2},
-                      {"PARAMNAME": "POC_SYSTEM_ID", "PARAMVALUE": POC_SYSTEM_ID, "CLUSTERID": 2}
-                    ]
-                }) | list | sum(start=[])
-              }}
-        - name: Create full request data
-          set_fact:
-            data:
-              context: MICROSVC_GLOBAL_ATTR_VALUE_CONFIG
-              action: MICROSVC_GLOBAL_ATTR_VALUE_CONFIG_UPDATE
-              object: {}
-              actionObject: "{{ action_object }}"
-        - name: Debug the request payload
-          debug:
-            var: data
-        - name: Sending Update request for COMMON CONFIG
-          uri:
-            url: "http://{{ cmsurl }}/cms/config?v=634844190505"
-            headers:
-              Connection: keep-alive
-              Authorization: "Bearer {{ cms_login_token }}"
-              Accept: "application/json, text/plain, */*"
-            method: POST
-            body: "{{ data }}"
-            body_format: json
-            return_content: yes
-            timeout: 600
-          register: response
-          failed_when: response.status not in [200, 201]
-        - name: Show API response
-          debug:
-            var: response
-        - name: update the task in status file
-          lineinfile:
-            path: "{{ status_file }}"
-            line: micro_common_configuration
-      when: "'micro_common_configuration' not in status_check_list"
+    - import_role:
+        name: checkjob
+
+    - name: Build actionObject list of parameter dicts
+      set_fact:
+        action_object: >-
+          {{
+            [1, 2] | map('extract', {
+              1:
+                [
+                  {"PARAMNAME": "ABDGFEATUREFLAG", "PARAMVALUE": micro_common_config['ABDG_FEATURE_FLAG'], "CLUSTERID": 1},
+                  {"PARAMNAME": "AFFILIATION_MONITORING_FLAG", "PARAMVALUE": micro_common_config['AFFILIATION_MONITORING_FLAG'], "CLUSTERID": 1},
+                  {"PARAMNAME": "CATUI_FQDN", "PARAMVALUE": "wms" + wildcard, "CLUSTERID": 1},
+                  {"PARAMNAME": "CORP_HIERARCHY", "PARAMVALUE": micro_common_config['CORP_HIERARCHY'], "CLUSTERID": 1},
+                  {"PARAMNAME": "DEVICE_SHARING_FEATURE_FLAG", "PARAMVALUE": micro_common_config['DEVICE_SHARING_FEATURE_FLAG'], "CLUSTERID": 1},
+                  {"PARAMNAME": "DYNAPI_SERVICE_ENABLED", "PARAMVALUE": micro_common_config['DYNAPI_SERVICE_ENABLED'], "CLUSTERID": 1},
+                  {"PARAMNAME": "GCM_PUSH_NOTIFY", "PARAMVALUE": micro_common_config['GCM_PUSH_NOTIFY'], "CLUSTERID": 1},
+                  {"PARAMNAME": "GEOFENCE_ENABLED", "PARAMVALUE": micro_common_config['GEOFENCE_ENABLED'], "CLUSTERID": 1},
+                  {"PARAMNAME": "GOOGLE_MAPS_API_KEY", "PARAMVALUE": global_micro_common_config[0]['GOOGLE_MAPS_API_KEY'], "CLUSTERID": 1},
+                  {"PARAMNAME": "GRPMEM_LOC_SVC_ENABLED", "PARAMVALUE": micro_common_config['GRPMEM_LOC_SVC_ENABLED'], "CLUSTERID": 1},
+                  {"PARAMNAME": "IDM_SERVICE_FLAG", "PARAMVALUE": micro_common_config['IDM_SERVICE_FLAG'], "CLUSTERID": 1},
+                  {"PARAMNAME": "IDM_WS_FQDN", "PARAMVALUE": "https://wms" + wildcard, "CLUSTERID": 1},
+                  {"PARAMNAME": "KEYCLOAK_EXTFQDN", "PARAMVALUE": "wms" + wildcard, "CLUSTERID": 1},
+                  {"PARAMNAME": "KEYCLOAK_PRIVATE_EXTFQDN", "PARAMVALUE": "wms" + wildcard, "CLUSTERID": 1},
+                  {"PARAMNAME": "KPNS_NOTIFYENSFLAG", "PARAMVALUE": micro_common_config['KPNS_NOTIFYENSFLAG'], "CLUSTERID": 1},
+                  {"PARAMNAME": "LOCATION_SVC_ENABLED", "PARAMVALUE": micro_common_config['LOCATION_SVC_ENABLED'], "CLUSTERID": 1},
+                  {"PARAMNAME": "MOBILESYNCFLAG", "PARAMVALUE": micro_common_config['MOBILESYNCFLAG'], "CLUSTERID": 1},
+                  {"PARAMNAME": "PRESENCE_SVC_ENABLED", "PARAMVALUE": micro_common_config['PRESENCE_SVC_ENABLED'], "CLUSTERID": 1},
+                  {"PARAMNAME": "PTXFEATUREFLAG", "PARAMVALUE": micro_common_config['PTXFEATUREFLAG'], "CLUSTERID": 1},
+                  {"PARAMNAME": "QPPPTXFEATUREFLAG", "PARAMVALUE": micro_common_config['QPPPTXFEATUREFLAG'], "CLUSTERID": 1},
+                  {"PARAMNAME": "RESOURCE_SVR_EXTERNAL_FQDN", "PARAMVALUE": "wms" + wildcard, "CLUSTERID": 1},
+                  {"PARAMNAME": "SGWR_IS_FILTERED_REPLICATION", "PARAMVALUE": micro_common_config['SGWR_IS_FILTERED_REPLICATION'], "CLUSTERID": 1},
+                  {"PARAMNAME": "UPSTREAM_DNS_SERVER_IP", "PARAMVALUE": global_micro_common_config[0]['UPSTREAM_DNS_SERVER_IP'], "CLUSTERID": 1},
+                  {"PARAMNAME": "VOICEMSGFALLBACKFLAG", "PARAMVALUE": micro_common_config['VOICEMSGFALLBACKFLG'], "CLUSTERID": 1},
+                  {"PARAMNAME": "WCSR_FQDN", "PARAMVALUE": "wms" + wildcard, "CLUSTERID": 1},
+                  {"PARAMNAME": "XCAPMOBILESYNCFLAG", "PARAMVALUE": micro_common_config['XCAPMOBILESYNCFLAG'], "CLUSTERID": 1},
+                  {"PARAMNAME": "WDS_EXTFQDN", "PARAMVALUE": "wds" + wildcard, "CLUSTERID": 1},
+                  {"PARAMNAME": "WDS_IDM_WS_FQDN", "PARAMVALUE": "https://wms" + wildcard, "CLUSTERID": 1},
+                  {"PARAMNAME": "WDS_KEYCLOAK_EXTFQDN", "PARAMVALUE": "wms" + wildcard, "CLUSTERID": 1},
+                  {"PARAMNAME": "WDS_RESOURCE_SVR_EXTERNAL_FQDN", "PARAMVALUE": "wms" + wildcard, "CLUSTERID": 1},
+                  {"PARAMNAME": "IS_SYNCGW_INSTALLED", "PARAMVALUE": "0", "CLUSTERID": 1},
+                  {"PARAMNAME": "SSH_TERMINATE_DIALOG_OPT_FLAG", "PARAMVALUE": "1", "CLUSTERID": 1},
+                  {"PARAMNAME": "IDAP_INSTALLED_FLAG", "PARAMVALUE": idap_micro_common_config['IDAP_INSTALLED_FLAG'], "CLUSTERID": 1},
+                  {"PARAMNAME": "IDAP_INSTALL_LIGHT", "PARAMVALUE": idap_micro_common_config['IDAP_INSTALL_LIGHT'], "CLUSTERID": 1},
+                  {"PARAMNAME": "ELASTIC_VERSION", "PARAMVALUE": idap_micro_common_config['ELASTIC_VERSION'], "CLUSTERID": 1},
+                  {"PARAMNAME": "HIVE_HADOOP_VERSION", "PARAMVALUE": idap_micro_common_config['HIVE_HADOOP_VERSION'], "CLUSTERID": 1},
+                  {"PARAMNAME": "PKI_ORGANISATION", "PARAMVALUE": INTERNAL_HOST_DOMAIN, "CLUSTERID": 1},
+                  {"PARAMNAME": "VAULT_TEMP_CERT_FLAG", "PARAMVALUE": "1", "CLUSTERID": 1},
+                  {"PARAMNAME": "POC_SYSTEM_ID", "PARAMVALUE": POC_SYSTEM_ID, "CLUSTERID": 1}
+                ],
+              2:
+                [
+                  {"PARAMNAME": "ABDGFEATUREFLAG", "PARAMVALUE": micro_common_config['ABDG_FEATURE_FLAG'], "CLUSTERID": 2},
+                  {"PARAMNAME": "AFFILIATION_MONITORING_FLAG", "PARAMVALUE": micro_common_config['AFFILIATION_MONITORING_FLAG'], "CLUSTERID": 2},
+                  {"PARAMNAME": "CATUI_FQDN", "PARAMVALUE": "wms" + wildcard, "CLUSTERID": 2},
+                  {"PARAMNAME": "CORP_HIERARCHY", "PARAMVALUE": micro_common_config['CORP_HIERARCHY'], "CLUSTERID": 2},
+                  {"PARAMNAME": "DEVICE_SHARING_FEATURE_FLAG", "PARAMVALUE": micro_common_config['DEVICE_SHARING_FEATURE_FLAG'], "CLUSTERID": 2},
+                  {"PARAMNAME": "DYNAPI_SERVICE_ENABLED", "PARAMVALUE": micro_common_config['DYNAPI_SERVICE_ENABLED'], "CLUSTERID": 2},
+                  {"PARAMNAME": "GCM_PUSH_NOTIFY", "PARAMVALUE": micro_common_config['GCM_PUSH_NOTIFY'], "CLUSTERID": 2},
+                  {"PARAMNAME": "GEOFENCE_ENABLED", "PARAMVALUE": micro_common_config['GEOFENCE_ENABLED'], "CLUSTERID": 2},
+                  {"PARAMNAME": "GOOGLE_MAPS_API_KEY", "PARAMVALUE": global_micro_common_config[0]['GOOGLE_MAPS_API_KEY'], "CLUSTERID": 2},
+                  {"PARAMNAME": "GRPMEM_LOC_SVC_ENABLED", "PARAMVALUE": micro_common_config['GRPMEM_LOC_SVC_ENABLED'], "CLUSTERID": 2},
+                  {"PARAMNAME": "IDM_SERVICE_FLAG", "PARAMVALUE": micro_common_config['IDM_SERVICE_FLAG'], "CLUSTERID": 2},
+                  {"PARAMNAME": "IDM_WS_FQDN", "PARAMVALUE": "https://wms" + wildcard, "CLUSTERID": 2},
+                  {"PARAMNAME": "KEYCLOAK_EXTFQDN", "PARAMVALUE": "wms" + wildcard, "CLUSTERID": 2},
+                  {"PARAMNAME": "KEYCLOAK_PRIVATE_EXTFQDN", "PARAMVALUE": "wms" + wildcard, "CLUSTERID": 2},
+                  {"PARAMNAME": "KPNS_NOTIFYENSFLAG", "PARAMVALUE": micro_common_config['KPNS_NOTIFYENSFLAG'], "CLUSTERID": 2},
+                  {"PARAMNAME": "LOCATION_SVC_ENABLED", "PARAMVALUE": micro_common_config['LOCATION_SVC_ENABLED'], "CLUSTERID": 2},
+                  {"PARAMNAME": "MOBILESYNCFLAG", "PARAMVALUE": micro_common_config['MOBILESYNCFLAG'], "CLUSTERID": 2},
+                  {"PARAMNAME": "PRESENCE_SVC_ENABLED", "PARAMVALUE": micro_common_config['PRESENCE_SVC_ENABLED'], "CLUSTERID": 2},
+                  {"PARAMNAME": "PTXFEATUREFLAG", "PARAMVALUE": micro_common_config['PTXFEATUREFLAG'], "CLUSTERID": 2},
+                  {"PARAMNAME": "QPPPTXFEATUREFLAG", "PARAMVALUE": micro_common_config['QPPPTXFEATUREFLAG'], "CLUSTERID": 2},
+                  {"PARAMNAME": "RESOURCE_SVR_EXTERNAL_FQDN", "PARAMVALUE": "wms" + wildcard, "CLUSTERID": 2},
+                  {"PARAMNAME": "SGWR_IS_FILTERED_REPLICATION", "PARAMVALUE": micro_common_config['SGWR_IS_FILTERED_REPLICATION'], "CLUSTERID": 2},
+                  {"PARAMNAME": "UPSTREAM_DNS_SERVER_IP", "PARAMVALUE": global_micro_common_config[0]['UPSTREAM_DNS_SERVER_IP'], "CLUSTERID": 2},
+                  {"PARAMNAME": "VOICEMSGFALLBACKFLAG", "PARAMVALUE": micro_common_config['VOICEMSGFALLBACKFLG'], "CLUSTERID": 2},
+                  {"PARAMNAME": "WCSR_FQDN", "PARAMVALUE": "wms" + wildcard, "CLUSTERID": 2},
+                  {"PARAMNAME": "XCAPMOBILESYNCFLAG", "PARAMVALUE": micro_common_config['XCAPMOBILESYNCFLAG'], "CLUSTERID": 2},
+                  {"PARAMNAME": "WDS_EXTFQDN", "PARAMVALUE": "wds" + wildcard, "CLUSTERID": 2},
+                  {"PARAMNAME": "WDS_IDM_WS_FQDN", "PARAMVALUE": "https://wms" + wildcard, "CLUSTERID": 2},
+                  {"PARAMNAME": "WDS_KEYCLOAK_EXTFQDN", "PARAMVALUE": "wms" + wildcard, "CLUSTERID": 2},
+                  {"PARAMNAME": "WDS_RESOURCE_SVR_EXTERNAL_FQDN", "PARAMVALUE": "wms" + wildcard, "CLUSTERID": 2},
+                  {"PARAMNAME": "IS_SYNCGW_INSTALLED", "PARAMVALUE": "0", "CLUSTERID": 2},
+                  {"PARAMNAME": "SSH_TERMINATE_DIALOG_OPT_FLAG", "PARAMVALUE": "1", "CLUSTERID": 2},
+                  {"PARAMNAME": "IDAP_INSTALLED_FLAG", "PARAMVALUE": idap_micro_common_config['IDAP_INSTALLED_FLAG'], "CLUSTERID": 2},
+                  {"PARAMNAME": "IDAP_INSTALL_LIGHT", "PARAMVALUE": idap_micro_common_config['IDAP_INSTALL_LIGHT'], "CLUSTERID": 2},
+                  {"PARAMNAME": "ELASTIC_VERSION", "PARAMVALUE": idap_micro_common_config['ELASTIC_VERSION'], "CLUSTERID": 2},
+                  {"PARAMNAME": "HIVE_HADOOP_VERSION", "PARAMVALUE": idap_micro_common_config['HIVE_HADOOP_VERSION'], "CLUSTERID": 2},
+                  {"PARAMNAME": "PKI_ORGANISATION", "PARAMVALUE": INTERNAL_HOST_DOMAIN, "CLUSTERID": 2},
+                  {"PARAMNAME": "VAULT_TEMP_CERT_FLAG", "PARAMVALUE": "1", "CLUSTERID": 2},
+                  {"PARAMNAME": "POC_SYSTEM_ID", "PARAMVALUE": POC_SYSTEM_ID, "CLUSTERID": 2}
+                ]
+            }) | list | sum(start=[])
+          }}
+    - name: Create full request data
+      set_fact:
+        data:
+          context: MICROSVC_GLOBAL_ATTR_VALUE_CONFIG
+          action: MICROSVC_GLOBAL_ATTR_VALUE_CONFIG_UPDATE
+          object: {}
+          actionObject: "{{ action_object }}"
+    - name: Debug the request payload
+      debug:
+        var: data
+    - name: Sending Update request for COMMON CONFIG
+      uri:
+        url: "http://{{ cmsurl }}/cms/config?v=634844190505"
+        headers:
+          Connection: keep-alive
+          Authorization: "Bearer {{ cms_login_token }}"
+          Accept: "application/json, text/plain, */*"
+        method: POST
+        body: "{{ data }}"
+        body_format: json
+        return_content: yes
+        timeout: 600
+      register: response
+      failed_when: response.status not in [200, 201]
+    - name: Show API response
+      debug:
+        var: response
