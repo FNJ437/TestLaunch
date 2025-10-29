@@ -157,5 +157,4 @@
           lineinfile:
               path: "{{status_file}}"
               line: "configure_apn"
-        	  
       when: "'configure_apn' not in status_check_list"
