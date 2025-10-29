@@ -1,0 +1,35 @@
+- name: Set node_name value
+  debug:
+    msg: "{{ node_name | default('')}}"
+  register: node_name_result
+
+- name: Set inv_name value
+  debug:
+    msg: "{{ inv_name | default('') }}"
+  register: inv_name_result
+
+- name: Set skip_callback value
+  debug:
+    msg: "{{ skip_callback | default(false) }}"
+  register: inv_name_result
+
+- name: node  exists  check
+  command: python3 nodeexistscheck.py --inv={{ inv_name }} --nodename={{ node_name }}
+  register: abc
+  delegate_to: localhost
+  ignore_errors: true
+  run_once: true
+
+- debug:  var=abc
+  run_once: true
+
+- name: Fail the play intentionally
+  fail:
+    msg: "Exiting play as {{ node_name }} is already success"
+  when: abc is defined and 'rc' in abc and abc.rc == 1 and failplay is defined and failplay == 1
+  run_once: true
+
+- name: End play as {{ node_name }} is already success
+  when: abc is defined and 'rc' in abc and abc.rc == 1
+  meta: end_play
+  run_once: true
