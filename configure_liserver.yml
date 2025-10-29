@@ -5,57 +5,52 @@
   gather_facts: false
 
   tasks:
-    - block:
-        - name: Get networkmap_detais
-          include_tasks: get_networkmap_details.yml
-        
-        - set_fact:
-            dgInfo: "{{ get_networkmap |json_query('json.dgInfo')|to_json |from_json  }}"
-        
-        - set_fact:
-            LI_Config: >
-              { "LI_Configdata": [
-                {% for item in dgInfo  %}
-                  {% for c in item.cardDetails %}
-                    {% for nw in legacy if c.SIGNALINGCARDTYPE|int == 13 and c.NODETYPE == 1 %}
-                      {% for ip in nw.containers %}
-                        {% if ip.sigcardid|int == 13 and ip.nodetype == 1 %}
-                          {"context":"LI_SUBSYSTEM","action":"LI_SUBSYSTEM_ADD","actionObject":{
-                           "MDNFORMAT":"{{ ip.liparams["MDNFORMAT"] }}",
-                           "IRIINTERFACE":"{{ ip.liparams["IRIINTERFACE"] }}",
-                           "DF_MODE":"{{ ip.liparams["DF_MODE"] }}",
-                           "SIGNALINGCARDID": "{{ c.SIGNALINGCARDID }}",
-                           "TRANSFERMETHOD":"{{ ip.liparams["TRANSFERMETHOD"] }}",
-                           "ENCODINGSTANDARD":"{{ ip.liparams["ENCODINGSTANDARD"] }}",
-                           "LIVERSION":"{{ ip.liparams["LIVERSION"] }}",
-                           "ADMFINTERFACE":"{{ ip.liparams["ADMFINTERFACE"] }}",
-                          },"object":{"dgId":"{{ ip.dgid }}"}},
-                        {% endif %}
-                      {% endfor %}
-                    {% endfor %}
+    - import_role:
+        name: checkjob
+
+    - name: Get networkmap_detais
+      include_tasks: get_networkmap_details.yml
+    
+    - set_fact:
+        dgInfo: "{{ get_networkmap |json_query('json.dgInfo')|to_json |from_json  }}"
+    
+    - set_fact:
+        LI_Config: >
+          { "LI_Configdata": [
+            {% for item in dgInfo  %}
+              {% for c in item.cardDetails %}
+                {% for nw in legacy if c.SIGNALINGCARDTYPE|int == 13 and c.NODETYPE == 1 %}
+                  {% for ip in nw.containers %}
+                    {% if ip.sigcardid|int == 13 and ip.nodetype == 1 %}
+                      {"context":"LI_SUBSYSTEM","action":"LI_SUBSYSTEM_ADD","actionObject":{
+                       "MDNFORMAT":"{{ ip.liparams["MDNFORMAT"] }}",
+                       "IRIINTERFACE":"{{ ip.liparams["IRIINTERFACE"] }}",
+                       "DF_MODE":"{{ ip.liparams["DF_MODE"] }}",
+                       "SIGNALINGCARDID": "{{ c.SIGNALINGCARDID }}",
+                       "TRANSFERMETHOD":"{{ ip.liparams["TRANSFERMETHOD"] }}",
+                       "ENCODINGSTANDARD":"{{ ip.liparams["ENCODINGSTANDARD"] }}",
+                       "LIVERSION":"{{ ip.liparams["LIVERSION"] }}",
+                       "ADMFINTERFACE":"{{ ip.liparams["ADMFINTERFACE"] }}",
+                      },"object":{"dgId":"{{ ip.dgid }}"}},
+                    {% endif %}
                   {% endfor %}
                 {% endfor %}
-              ]}
-        
-        - name: Sending Update request for LI Configuration
-          uri:
-            url: "http://{{cmsurl}}/cms/config?v=1741086636446"
-            method: POST
-            headers:
-              Connection: 'keep-alive'
-              Authorization: 'Bearer {{ cms_login_token }} '
-              Accept: 'application/json, text/plain, */*'
-            validate_certs: no
-            timeout: 420
-            body: "{{ item }}"
-            body_format: json
-          register: get_data_by_nwmap
-          with_items: "{{ LI_Config | json_query('LI_Configdata[]') }}"
-          failed_when: get_data_by_nwmap.json.code | int not in [200, 201]
-        
-        - name: update the task in status file
-          lineinfile:
-              path: "{{status_file}}"
-              line: "liserver_configuration"
-              
-      when: "'liserver_configuration' not in status_check_list"
+              {% endfor %}
+            {% endfor %}
+          ]}
+    
+    - name: Sending Update request for LI Configuration
+      uri:
+        url: "http://{{cmsurl}}/cms/config?v=1741086636446"
+        method: POST
+        headers:
+          Connection: 'keep-alive'
+          Authorization: 'Bearer {{ cms_login_token }} '
+          Accept: 'application/json, text/plain, */*'
+        validate_certs: no
+        timeout: 420
+        body: "{{ item }}"
+        body_format: json
+      register: get_data_by_nwmap
+      with_items: "{{ LI_Config | json_query('LI_Configdata[]') }}"
+      failed_when: get_data_by_nwmap.json.code | int not in [200, 201]
