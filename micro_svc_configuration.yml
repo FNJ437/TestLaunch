@@ -12,7 +12,7 @@
             method: POST
             headers:
               Connection: 'keep-alive'
-              Authorization: 'Bearer {{ result.json.accessToken }} '
+              Authorization: 'Bearer {{ cms_login_token }} '
               Accept: 'application/json, text/plain, */*'
             validate_certs: no
             body: {"context":"networkmap","action":"networkmap"}
@@ -37,7 +37,7 @@
             url: "http://{{ cms.url }}/cms/config?v=634844190505"
             headers:
               Connection: keep-alive
-              Authorization: "Bearer {{result.json.accessToken}}"
+              Authorization: "Bearer {{cms_login_token}}"
               Accept: "application/json, text/plain, */*"
             method: POST
             body: "{{item}}"
@@ -65,7 +65,7 @@
             url: "http://{{ cms.url }}/cms/config?v=634844190505"
             headers:
               Connection: keep-alive
-              Authorization: "Bearer {{result.json.accessToken}}"
+              Authorization: "Bearer {{cms_login_token}}"
               Accept: "application/json, text/plain, */*"
             method: POST
             body: "{{item}}"
@@ -94,7 +94,7 @@
         #    url: "http://{{ cms.url }}/cms/config?v=634844190505"
         #    headers:
         #      Connection: keep-alive
-        #      Authorization: "Bearer {{result.json.accessToken}}"
+        #      Authorization: "Bearer {{cms_login_token}}"
         #      Accept: "application/json, text/plain, */*"
         #    method: POST
         #    body: "{{item}}"
@@ -121,7 +121,7 @@
             url: "http://{{ cms.url }}/cms/config?v=634844190505"
             headers:
               Connection: keep-alive
-              Authorization: "Bearer {{result.json.accessToken}}"
+              Authorization: "Bearer {{cms_login_token}}"
               Accept: "application/json, text/plain, */*"
             method: POST
             body: "{{item}}"
@@ -162,7 +162,7 @@
             url: "http://{{ cms.url }}/cms/config?v=634844190505"
             headers:
               Connection: keep-alive
-              Authorization: "Bearer {{result.json.accessToken}}"
+              Authorization: "Bearer {{cms_login_token}}"
               Accept: "application/json, text/plain, */*"
             method: POST
             body: "{{item}}"
