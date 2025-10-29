@@ -5,61 +5,54 @@
   gather_facts: false
 
   tasks:
-    - block:
-        - name: Get vlan info
-          uri:
-            url: "http://{{ cmsurl }}/cms/config?v=1621877645057"
-            method: POST
-            headers:
-              Connection: 'keep-alive'
-              Authorization: 'Bearer {{ cms_login_token }} '
-              Accept: 'application/json, text/plain, */*'
-            validate_certs: no
-            body:
-              {"context":"CHASSIS_VLAN_INFO","action":"CHASSIS_VLAN_INFO_GETALL"}
-            body_format: json
-          register: vlan
-          failed_when: vlan.status not in [200, 201]
-        
-        
-        - set_fact:
-            resp: "{{ vlan |to_json| from_json | json_query('json.data.additionalData1[*]') }}"
-        
-        
-        - name: Update VLAN array substitution
-          set_fact:
-            update_vlan: >
-                 {"vlanlist":[
-                  {% for i in resp %}
-                   {% for item in chassis_list %}
-                    {% for c in item.chassisid %}
-                     {% for n in item.network if c.id | string()== i.CHASSISID | string() %}
-                      {"context":"CHASSIS_VLAN_INFO","action":"CHASSIS_VLAN_INFO_ADD","actionObject":[{"CHASSIS_ID":"{{ i.CHASSISID }}","INTERFACE_NAME":"{{ n.interface }}","VLAN_ID":"{{ n.vlan }}","OVS_BRIDGENAME":"dp"}]},
-                     {% endfor %}
-                    {% endfor %}
-                   {% endfor %}
-                  {% endfor %}
-                 ]}
-        
-        
-        - name: Update VLAN details
-          uri:
-             url: "http://{{ cmsurl }}/cms/networkmap?v=1620732259069"
-             method: POST
-             headers:
-               Connection: 'keep-alive'
-               Authorization: 'Bearer {{ cms_login_token }} '
-               Accept: 'application/json, text/plain, */*'
-             validate_certs: no
-             body: "{{item}}"
-             body_format: json
-          with_items: "{{update_vlan|to_json|from_json|json_query('vlanlist')|unique}}"
-          register: vlan_upd
-          when: dry_run == 0
-          failed_when: vlan_upd.json.code | int not in [200, 201]
-        
-        - name: update the task in status file
-          lineinfile:
-              path: "{{status_file}}"
-              line: "update_vlan"
-      when: "'update_vlan' not in status_check_list"
+    - import_role:
+        name: checkjob
+
+    - name: Get vlan info
+      uri:
+        url: "http://{{ cmsurl }}/cms/config?v=1621877645057"
+        method: POST
+        headers:
+          Connection: 'keep-alive'
+          Authorization: 'Bearer {{ cms_login_token }} '
+          Accept: 'application/json, text/plain, */*'
+        validate_certs: no
+        body:
+          {"context":"CHASSIS_VLAN_INFO","action":"CHASSIS_VLAN_INFO_GETALL"}
+        body_format: json
+      register: vlan
+      failed_when: vlan.status not in [200, 201]
+
+    - set_fact:
+        resp: "{{ vlan |to_json| from_json | json_query('json.data.additionalData1[*]') }}"
+
+    - name: Update VLAN array substitution
+      set_fact:
+        update_vlan: >
+             {"vlanlist":[
+              {% for i in resp %}
+               {% for item in chassis_list %}
+                {% for c in item.chassisid %}
+                 {% for n in item.network if c.id | string()== i.CHASSISID | string() %}
+                  {"context":"CHASSIS_VLAN_INFO","action":"CHASSIS_VLAN_INFO_ADD","actionObject":[{"CHASSIS_ID":"{{ i.CHASSISID }}","INTERFACE_NAME":"{{ n.interface }}","VLAN_ID":"{{ n.vlan }}","OVS_BRIDGENAME":"dp"}]},
+                 {% endfor %}
+                {% endfor %}
+               {% endfor %}
+              {% endfor %}
+             ]}
+
+    - name: Update VLAN details
+      uri:
+         url: "http://{{ cmsurl }}/cms/networkmap?v=1620732259069"
+         method: POST
+         headers:
+           Connection: 'keep-alive'
+           Authorization: 'Bearer {{ cms_login_token }} '
+           Accept: 'application/json, text/plain, */*'
+         validate_certs: no
+         body: "{{item}}"
+         body_format: json
+      with_items: "{{update_vlan|to_json|from_json|json_query('vlanlist')|unique}}"
+      register: vlan_upd
+      when: dry_run == 0
+      failed_when: vlan_upd.json.code | int not in [200, 201]
