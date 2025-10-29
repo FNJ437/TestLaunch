@@ -6,7 +6,7 @@
 
   tasks:
     - import_role:
-	    name: checkjob
+        name: checkjob
 
     - name: Get networkmap
       no_log: true
@@ -22,28 +22,28 @@
         body_format: json
       register: get_networkmap
       failed_when: get_networkmap.status not in [200, 201]
-    
-    
+
+
     - name: Media VS which requires SSL Profile Name update
       set_fact:
         Media_VS_SSL_Profile: ['Media TLS Internet IPv4 Virtual Server','Media DTLS Cellular Internet APN IPv4 Virtual Server']
-    
+
     - name: Fetching DGID of F5
       set_fact:
         geo_f5_dgid: >-
             {% for server in get_networkmap.json.dgInfo %}{% if server.CARDTYPE == 101 and server.cardDetails[0].CLUSTERID == '2'%}{{server.DGID}}{% endif %}{% endfor %}
         pri_f5_dgid: >-
             {% for server in get_networkmap.json.dgInfo %}{% if server.CARDTYPE == 101 and server.cardDetails[0].CLUSTERID == '1'%}{{server.DGID}}{% endif %}{% endfor %}
-    
+
     - name: Fetching F5 PTTSERVERIDs
       set_fact:
         geo_f5_pttserverid: >-
             {% for server in get_networkmap.json.dgInfo %}{% if server.CARDTYPE == 101 and server.cardDetails[0].CLUSTERID == '2'%}{{server.cardDetails[0].PTTSERVERID}}{% endif %}{% endfor %}
         pri_f5_pttserverid: >-
             {% for server in get_networkmap.json.dgInfo %}{% if server.CARDTYPE == 101 and server.cardDetails[0].CLUSTERID == '1'%}{{server.cardDetails[0].PTTSERVERID}}{% endif %}{% endfor %}
-    
+
     ################################################# GLOBAL VS SSL Profile Name Update #######################################
-    
+
     - name: Get the list of primary virtual servers
       no_log: true
       uri:
@@ -58,11 +58,11 @@
          body_format: json
       register: virtual_server_list
       failed_when: virtual_server_list.status not in [200, 201]
-    
+
     - name: Filter vs list
       set_fact:
         doc1: "{{ virtual_server_list |to_json| from_json | json_query('json.data.childNodes[0].childNodes[].dataJson') }}"
-    
+
     - name: Create Request Body for Global VS in Primary
       set_fact:
         ssl_pri: >
@@ -79,7 +79,7 @@
              {% endfor %}
              {% endfor %}
              ]}
-    
+
     - name: Get the list of geo virtual servers
       no_log: true
       uri:
@@ -94,11 +94,11 @@
          body_format: json
       register: virtual_server_list_geo
       failed_when: virtual_server_list_geo.status not in [200, 201]
-    
+
     - name: Filter vs list
       set_fact:
         doc2: "{{ virtual_server_list_geo |to_json| from_json | json_query('json.data.childNodes[0].childNodes[].dataJson') }}"
-    
+
     - name: Create Request Body for Global VS in Geo
       set_fact:
         ssl_geo: >
@@ -115,8 +115,8 @@
              {% endfor %}
              {% endfor %}
              ]}
-    
-    
+
+
     - name: update profile_ssl_name for global vs in primary
       uri:
          url: "http://{{ cmsurl }}/cms/networkmap?v=1620732259069"
@@ -132,7 +132,7 @@
       register: pri_profile
       with_items: "{{ssl_pri|to_json|from_json|json_query('ssl_config_pri')}}"
       failed_when: pri_profile.json.code | int not in [200, 201]
-    
+
     - name: update profile_ssl_name for global vs in geo
       uri:
          url: "http://{{ cmsurl }}/cms/networkmap?v=1620732259069"
@@ -148,19 +148,19 @@
       register: geo_profile
       with_items: "{{ssl_geo|to_json|from_json|json_query('ssl_config_geo')}}"
       failed_when: geo_profile.json.code | int not in [200, 201]
-    
-    
+
+
     ################################################# POC VS SSL Profile Name Update #######################################
-    
+
     - name: Filter pri poc vs list
       set_fact:
         doc1: "{{ virtual_server_list |to_json| from_json | json_query('json.data.childNodes[2].childNodes[].{action_object: {sig_name:dataJson.SIGNALINGCARD_NAME, pttserverid:dataJson.PTTSERVERID}, json_value: childNodes[].dataJson.{DISPLAYNAME: DISPLAYNAME, APPSERVER_VS_ID: APPSERVER_VS_ID, APPSERVER_PTTSERVERID: APPSERVER_PTTSERVERID, VIRTUALSERVERTYPE: VIRTUALSERVERTYPE, VIRTUALSERVEREXTIP_VERSION: VIRTUALSERVEREXTIP_VERSION, F5_VIRTUALSERVERID: F5_VIRTUALSERVERID} }') }}"
-    
+
     - name: Filter geo poc vs list
       set_fact:
         doc2: "{{ virtual_server_list_geo |to_json| from_json | json_query('json.data.childNodes[2].childNodes[].{action_object: {sig_name:dataJson.SIGNALINGCARD_NAME, pttserverid:dataJson.PTTSERVERID}, json_value: childNodes[].dataJson.{DISPLAYNAME: DISPLAYNAME, APPSERVER_VS_ID: APPSERVER_VS_ID, APPSERVER_PTTSERVERID: APPSERVER_PTTSERVERID, VIRTUALSERVERTYPE: VIRTUALSERVERTYPE, VIRTUALSERVEREXTIP_VERSION: VIRTUALSERVEREXTIP_VERSION, F5_VIRTUALSERVERID: F5_VIRTUALSERVERID} }') }}"
-    
-    
+
+
     - name: Create Request Body for POC VS in Primary
       set_fact:
         ssl_poc_pri: >
@@ -179,7 +179,7 @@
              {% endfor %}
              {% endfor %}
              ]}
-    
+
     - name: update profile_ssl_name for poc vs in primary
       uri:
          url: "http://{{ cmsurl }}/cms/networkmap?v=1620732259069"
@@ -195,7 +195,7 @@
       register: pri_profile
       with_items: "{{ssl_poc_pri|to_json|from_json|json_query('ssl_config_poc_pri')}}"
       failed_when: pri_profile.json.code | int not in [200, 201]
-    
+
     - name: Create Request Body for POC VS in Geo
       set_fact:
         ssl_poc_geo: >
@@ -214,7 +214,7 @@
              {% endfor %}
              {% endfor %}
              ]}
-    
+
     - name: update profile_ssl_name for poc vs in geo
       uri:
          url: "http://{{ cmsurl }}/cms/networkmap?v=1620732259069"
@@ -230,17 +230,17 @@
       register: geo_ssl
       with_items: "{{ssl_poc_geo|to_json|from_json|json_query('ssl_config_poc_geo')}}"
       failed_when: geo_ssl.json.code | int not in [200, 201]
-    
-    
+
+
     ################################################Media VS SSL Profile Name Update########################################################
-    
+
     - name: Filter pri media vs list
       set_fact:
         doc1: "{{ virtual_server_list |to_json| from_json | json_query('json.data.childNodes[2].childNodes[].childNodes[].{action_obj: {cardname: dataJson.MEDIACARDNAME, pttid: dataJson.MEDIACARD_PTTSERVERID}, json_value: childNodes[].childNodes[].childNodes[].dataJson.{DISPLAYNAME: DISPLAYNAME, APPSERVER_VS_ID: APPSERVER_VS_ID, APPSERVER_PTTSERVERID: APPSERVER_PTTSERVERID, VIRTUALSERVERTYPE: VIRTUALSERVERTYPE, VIRTUALSERVEREXTIP_VERSION: VIRTUALSERVEREXTIP_VERSION, F5_VIRTUALSERVERID: F5_VIRTUALSERVERID, SIGNALINGCARD_NAME: SIGNALINGCARD_NAME, MEDIACARDNAME: MEDIACARDNAME, ALIAS_IP_PARENT_TYPE: ALIAS_IP_PARENT_TYPE, ALIASIP: ALIASIP }}') }}"
     - set_fact:
         media_details: "{{doc1 |to_json| from_json | json_query('[?json_value != null]')}}"
-    
-    
+
+
     - name: Create Request Body for Media VS in Primary
       set_fact:
         ssl_media_pri: >
@@ -261,7 +261,7 @@
              {% endfor %}
              {% endfor %}
              ]}
-    
+
     - name: update profile_ssl_name for media vs in pri
       uri:
          url: "http://{{ cmsurl }}/cms/networkmap?v=1620732259069"
@@ -277,14 +277,14 @@
       register: media_ssl
       with_items: "{{ssl_media_pri|to_json|from_json|json_query('ssl_media_config_pri')}}"
       failed_when: media_ssl.json.code | int not in [200, 201]
-    
-    
+
+
     - name: Filter geo media vs list
       set_fact:
         doc2: "{{ virtual_server_list_geo |to_json| from_json | json_query('json.data.childNodes[2].childNodes[].childNodes[].{action_obj: {cardname: dataJson.MEDIACARDNAME, pttid: dataJson.MEDIACARD_PTTSERVERID}, json_value: childNodes[].childNodes[].childNodes[].dataJson.{DISPLAYNAME: DISPLAYNAME, APPSERVER_VS_ID: APPSERVER_VS_ID, APPSERVER_PTTSERVERID: APPSERVER_PTTSERVERID, VIRTUALSERVERTYPE: VIRTUALSERVERTYPE, VIRTUALSERVEREXTIP_VERSION: VIRTUALSERVEREXTIP_VERSION, F5_VIRTUALSERVERID: F5_VIRTUALSERVERID, SIGNALINGCARD_NAME: SIGNALINGCARD_NAME, MEDIACARDNAME: MEDIACARDNAME, ALIAS_IP_PARENT_TYPE: ALIAS_IP_PARENT_TYPE, ALIASIP: ALIASIP }}') }}"
     - set_fact:
         media_details: "{{doc2 |to_json| from_json | json_query('[?json_value != null]')}}"
-    
+
     - name: Create Request Body for Media VS in Geo
       set_fact:
         ssl_media_geo: >
@@ -305,7 +305,7 @@
              {% endfor %}
              {% endfor %}
              ]}
-    
+
     - name: update profile_ssl_name for media vs in geo
       uri:
          url: "http://{{ cmsurl }}/cms/networkmap?v=1620732259069"
