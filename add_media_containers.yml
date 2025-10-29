@@ -59,7 +59,7 @@
     
     - name: Add media containers
       uri:
-        url: "http://{{ cms.url }}/cms/config?v=1618385170120"
+        url: "http://{{ cmsurl }}/cms/config?v=1618385170120"
         method: POST
         headers:
           Connection: 'keep-alive'
