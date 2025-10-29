@@ -4,24 +4,6 @@
   gather_facts: false
 
   tasks:
-    - name: create status file if not exist
-      file:
-        state: touch
-        path: "{{status_file}}"
-    - name: read the contents of a file
-      slurp:
-        src: "{{status_file}}"
-      register: status_data
-
-    - debug:
-        msg: "{{ (status_data['content'] | b64decode).splitlines() }}"
-
-    - name: Storing status_check_list
-      ansible.builtin.set_stats:
-        data:
-          status_check_list: "{{ (status_data['content'] | b64decode).splitlines() }}"
-        aggregate: no
-
     - name: Generate the API authenticator token.
       uri:
         url: "http://{{ cmsurl }}/cms/login?v=1618381584572"
@@ -39,10 +21,9 @@
       set_fact:
         cms_token: "{{ result.json.accessToken }}"
       when: result.json.accessToken is defined
-      
+
     - name: Aggregating packages_installed stat per host
       ansible.builtin.set_stats:
         data:
           cms_login_token: '{{ result.json.accessToken }}'
         aggregate: no
-
