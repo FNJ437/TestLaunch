@@ -6,7 +6,7 @@
 
   tasks:
     - import_role:
-        name: checkjb
+        name: checkjob
 
     - name: MICROSVC_GLOBAL_CLUSTER_INFO_CONFIG_GETALL
       uri:
