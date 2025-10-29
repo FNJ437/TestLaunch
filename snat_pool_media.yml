@@ -5,159 +5,154 @@
   gather_facts: false
 
   tasks:
-    - block:
-        - name: Get networkmap
-          no_log: true
-          uri:
-            url: "http://{{cmsurl}}/cms/networkmap?v=1633605424448"
-            method: POST
-            headers:
-              Connection: 'keep-alive'
-              Authorization: 'Bearer {{ cms_login_token }} '
-              Accept: 'application/json, text/plain, */*'
-            validate_certs: no
-            body: {"context":"networkmap","action":"networkmap"}
-            body_format: json
-          register: get_networkmap
-        
-        
-        - name: Fetching DGID of F5
-          set_fact:
-            geo_f5_dgid: >-
-                {% for server in get_networkmap.json.dgInfo %}{% if server.CARDTYPE == 101 and server.cardDetails[0].CLUSTERID == '2'%}{{server.DGID}}{% endif %}{% endfor %}
-            pri_f5_dgid: >-
-                {% for server in get_networkmap.json.dgInfo %}{% if server.CARDTYPE == 101 and server.cardDetails[0].CLUSTERID == '1'%}{{server.DGID}}{% endif %}{% endfor %}
-        
-        - name: Fetching F5 PTTSERVERIDs
-          set_fact:
-            geo_f5_pttserverid: >-
-                {% for server in get_networkmap.json.dgInfo %}{% if server.CARDTYPE == 101 and server.cardDetails[0].CLUSTERID == '2'%}{{server.cardDetails[0].PTTSERVERID}}{% endif %}{% endfor %}
-            pri_f5_pttserverid: >-
-                {% for server in get_networkmap.json.dgInfo %}{% if server.CARDTYPE == 101 and server.cardDetails[0].CLUSTERID == '1'%}{{server.cardDetails[0].PTTSERVERID}}{% endif %}{% endfor %}
-        
-        - name: Get the list of primary virtual servers
-          no_log: true
-          uri:
-             url: "http://{{ cmsurl }}/cms/networkmap?v=1620732259069"
-             method: POST
-             headers:
-               Connection: 'keep-alive'
-               Authorization: 'Bearer {{ cms_login_token }} '
-               Accept: 'application/json, text/plain, */*'
-             validate_certs: no
-             body: '{"context":"CONFIGURED_VIRTUAL_SERVER","action":"CONFIGURED_VIRTUAL_SERVER_GETALL","object":{"dgId":"{{pri_f5_dgid}}"}}'
-             body_format: json
-          register: virtual_server_list
-        
-        
-        - name: Get the list of geo virtual servers
-          no_log: true
-          uri:
-             url: "http://{{ cmsurl }}/cms/networkmap?v=1620732259069"
-             method: POST
-             headers:
-               Connection: 'keep-alive'
-               Authorization: 'Bearer {{ cms_login_token }} '
-               Accept: 'application/json, text/plain, */*'
-             validate_certs: no
-             body: '{"context":"CONFIGURED_VIRTUAL_SERVER","action":"CONFIGURED_VIRTUAL_SERVER_GETALL","object":{"dgId":"{{geo_f5_dgid}}"}}'
-             body_format: json
-          register: virtual_server_list_geo
-        
-        ############################################################### Pri Media SNAT configuration ##########################################
-        
-        - name: Filter pri media snat list
-          set_fact:
-            doc1: "{{ virtual_server_list |to_json| from_json | json_query('json.data.childNodes[2].childNodes[].childNodes[].{action_obj: {cardname: dataJson.MEDIACARDNAME, pttid: dataJson.MEDIACARD_PTTSERVERID}, json_value: childNodes[].childNodes[].childNodes[].dataJson.{DISPLAYNAME: DISPLAYNAME, APPSERVER_VS_ID: APPSERVER_VS_ID, APPSERVER_PTTSERVERID: APPSERVER_PTTSERVERID, VIRTUALSERVERTYPE: VIRTUALSERVERTYPE, VIRTUALSERVEREXTIP_VERSION: VIRTUALSERVEREXTIP_VERSION, F5_VIRTUALSERVERID: F5_VIRTUALSERVERID, SIGNALINGCARD_NAME: SIGNALINGCARD_NAME, MEDIACARDNAME: MEDIACARDNAME, ALIAS_IP_PARENT_TYPE: ALIAS_IP_PARENT_TYPE, ALIASIP: ALIASIP }}') }}"
-        - set_fact:
-            media_details: "{{doc1 |to_json| from_json | json_query('[?json_value != null]')}}"
-        
-        
-        - name: Configure pri media snat
-          set_fact:
-            snat_pri: >
-               {"ip_snat":[
-                 {% for item in media_details %}
-                 {% for vs_name in media_vs %}
-                 {% for j in item.json_value %}
-                 {% for i in vs_name.virtual_servers if i.name == j.DISPLAYNAME %}
-                 {% if j.DISPLAYNAME not in ( "Media TLS Internet IPv4 Virtual Server", "Media TLS Internet IPv6 Virtual Server" ) %}
-                 {% if i.aliasip == j.ALIASIP|trim %}
-                 {% if vs_name.clusterid == 1 %}
-                   {"context":"F5_VS_IPADDRINFO","action":"F5_VS_IPADDRINFO_UPDATE", "object": {"dgId": "{{pri_f5_dgid}}"}, "actionObject":[{"IPADDRESS_VERSION": 1, "IPADDRESS": "{{ i.snatip }}", "F5_PTTSERVERID": "{{pri_f5_pttserverid}}", "F5_VIRTUALSERVERID": {{j.F5_VIRTUALSERVERID|trim}} }]},
-                   {% endif %}
-                   {% endif %}
-                   {% endif %}
-                   {% endfor %}
-                   {% endfor %}
-                   {% endfor %}
-                   {% endfor %}
-                   ]}
-        
-        - name: Add pri media snat servers to gui
-          uri:
-             url: "http://{{ cmsurl }}/cms/networkmap?v=1620732259069"
-             method: POST
-             headers:
-               Connection: 'keep-alive'
-               Authorization: 'Bearer {{ cms_login_token }} '
-               Accept: 'application/json, text/plain, */*'
-             validate_certs: no
-             timeout: 420
-             body: '{{item}}'
-             body_format: json
-          register: pri_snat
-          with_items: "{{snat_pri|to_json|from_json|json_query('ip_snat')}}"
-          failed_when: pri_snat.json.code | int not in [200, 201]
-        
-        ############################################################### GEO Media SNAT configuration ##########################################
-        
-        - name: Filter geo media snat list
-          set_fact:
-            doc2: "{{ virtual_server_list_geo |to_json| from_json | json_query('json.data.childNodes[2].childNodes[].childNodes[].{action_obj: {cardname: dataJson.MEDIACARDNAME, pttid: dataJson.MEDIACARD_PTTSERVERID}, json_value: childNodes[].childNodes[].childNodes[].dataJson.{DISPLAYNAME: DISPLAYNAME, APPSERVER_VS_ID: APPSERVER_VS_ID, APPSERVER_PTTSERVERID: APPSERVER_PTTSERVERID, VIRTUALSERVERTYPE: VIRTUALSERVERTYPE, VIRTUALSERVEREXTIP_VERSION: VIRTUALSERVEREXTIP_VERSION, F5_VIRTUALSERVERID: F5_VIRTUALSERVERID, SIGNALINGCARD_NAME: SIGNALINGCARD_NAME, MEDIACARDNAME: MEDIACARDNAME, ALIAS_IP_PARENT_TYPE: ALIAS_IP_PARENT_TYPE, ALIASIP: ALIASIP }}') }}"
-        - set_fact:
-            media_details: "{{doc2 |to_json| from_json | json_query('[?json_value != null]')}}"
-        
-        - name: Configure geo media snat
-          set_fact:
-            snat_geo: >
-               {"ip_snat":[
-                 {% for item in media_details %}
-                 {% for vs_name in media_vs %}
-                 {% for j in item.json_value %}
-                 {% for i in vs_name.virtual_servers if i.name == j.DISPLAYNAME %}
-                 {% if j.DISPLAYNAME not in ( "Media TLS Internet IPv4 Virtual Server", "Media TLS Internet IPv6 Virtual Server" ) %}
-                 {% if i.aliasip == j.ALIASIP|trim %}
-                 {% if vs_name.clusterid == 2 %}
-                   {"context":"F5_VS_IPADDRINFO","action":"F5_VS_IPADDRINFO_UPDATE", "object": {"dgId": "{{geo_f5_dgid}}"}, "actionObject":[{"IPADDRESS_VERSION": 1, "IPADDRESS": "{{ i.snatip }}", "F5_PTTSERVERID": "{{geo_f5_pttserverid}}", "F5_VIRTUALSERVERID": {{j.F5_VIRTUALSERVERID|trim}} }]},
-                   {% endif %}
-                   {% endif %}
-                   {% endif %}
-                   {% endfor %}
-                   {% endfor %}
-                   {% endfor %}
-                   {% endfor %}
-                   ]}
-        
-        - name: Add geo media snat servers to gui
-          uri:
-             url: "http://{{ cmsurl }}/cms/networkmap?v=1620732259069"
-             method: POST
-             headers:
-               Connection: 'keep-alive'
-               Authorization: 'Bearer {{ cms_login_token }} '
-               Accept: 'application/json, text/plain, */*'
-             validate_certs: no
-             timeout: 420
-             body: '{{item}}'
-             body_format: json
-          register: geo_snat
-          with_items: "{{snat_geo|to_json|from_json|json_query('ip_snat')}}"
-          failed_when: geo_snat.json.code | int not in [200, 201]
-        
-        - name: update the task in status file
-          lineinfile:
-              path: "{{status_file}}"
-              line: "snat_pool_media"
-        
-      when: "'snat_pool_media' not in status_check_list"
+    - import_role:
+        name: checkjob
+
+    - name: Get networkmap
+      no_log: true
+      uri:
+        url: "http://{{cmsurl}}/cms/networkmap?v=1633605424448"
+        method: POST
+        headers:
+          Connection: 'keep-alive'
+          Authorization: 'Bearer {{ cms_login_token }} '
+          Accept: 'application/json, text/plain, */*'
+        validate_certs: no
+        body: {"context":"networkmap","action":"networkmap"}
+        body_format: json
+      register: get_networkmap
+    
+    
+    - name: Fetching DGID of F5
+      set_fact:
+        geo_f5_dgid: >-
+            {% for server in get_networkmap.json.dgInfo %}{% if server.CARDTYPE == 101 and server.cardDetails[0].CLUSTERID == '2'%}{{server.DGID}}{% endif %}{% endfor %}
+        pri_f5_dgid: >-
+            {% for server in get_networkmap.json.dgInfo %}{% if server.CARDTYPE == 101 and server.cardDetails[0].CLUSTERID == '1'%}{{server.DGID}}{% endif %}{% endfor %}
+    
+    - name: Fetching F5 PTTSERVERIDs
+      set_fact:
+        geo_f5_pttserverid: >-
+            {% for server in get_networkmap.json.dgInfo %}{% if server.CARDTYPE == 101 and server.cardDetails[0].CLUSTERID == '2'%}{{server.cardDetails[0].PTTSERVERID}}{% endif %}{% endfor %}
+        pri_f5_pttserverid: >-
+            {% for server in get_networkmap.json.dgInfo %}{% if server.CARDTYPE == 101 and server.cardDetails[0].CLUSTERID == '1'%}{{server.cardDetails[0].PTTSERVERID}}{% endif %}{% endfor %}
+    
+    - name: Get the list of primary virtual servers
+      no_log: true
+      uri:
+         url: "http://{{ cmsurl }}/cms/networkmap?v=1620732259069"
+         method: POST
+         headers:
+           Connection: 'keep-alive'
+           Authorization: 'Bearer {{ cms_login_token }} '
+           Accept: 'application/json, text/plain, */*'
+         validate_certs: no
+         body: '{"context":"CONFIGURED_VIRTUAL_SERVER","action":"CONFIGURED_VIRTUAL_SERVER_GETALL","object":{"dgId":"{{pri_f5_dgid}}"}}'
+         body_format: json
+      register: virtual_server_list
+    
+    
+    - name: Get the list of geo virtual servers
+      no_log: true
+      uri:
+         url: "http://{{ cmsurl }}/cms/networkmap?v=1620732259069"
+         method: POST
+         headers:
+           Connection: 'keep-alive'
+           Authorization: 'Bearer {{ cms_login_token }} '
+           Accept: 'application/json, text/plain, */*'
+         validate_certs: no
+         body: '{"context":"CONFIGURED_VIRTUAL_SERVER","action":"CONFIGURED_VIRTUAL_SERVER_GETALL","object":{"dgId":"{{geo_f5_dgid}}"}}'
+         body_format: json
+      register: virtual_server_list_geo
+    
+    ############################################################### Pri Media SNAT configuration ##########################################
+    
+    - name: Filter pri media snat list
+      set_fact:
+        doc1: "{{ virtual_server_list |to_json| from_json | json_query('json.data.childNodes[2].childNodes[].childNodes[].{action_obj: {cardname: dataJson.MEDIACARDNAME, pttid: dataJson.MEDIACARD_PTTSERVERID}, json_value: childNodes[].childNodes[].childNodes[].dataJson.{DISPLAYNAME: DISPLAYNAME, APPSERVER_VS_ID: APPSERVER_VS_ID, APPSERVER_PTTSERVERID: APPSERVER_PTTSERVERID, VIRTUALSERVERTYPE: VIRTUALSERVERTYPE, VIRTUALSERVEREXTIP_VERSION: VIRTUALSERVEREXTIP_VERSION, F5_VIRTUALSERVERID: F5_VIRTUALSERVERID, SIGNALINGCARD_NAME: SIGNALINGCARD_NAME, MEDIACARDNAME: MEDIACARDNAME, ALIAS_IP_PARENT_TYPE: ALIAS_IP_PARENT_TYPE, ALIASIP: ALIASIP }}') }}"
+    - set_fact:
+        media_details: "{{doc1 |to_json| from_json | json_query('[?json_value != null]')}}"
+    
+    
+    - name: Configure pri media snat
+      set_fact:
+        snat_pri: >
+           {"ip_snat":[
+             {% for item in media_details %}
+             {% for vs_name in media_vs %}
+             {% for j in item.json_value %}
+             {% for i in vs_name.virtual_servers if i.name == j.DISPLAYNAME %}
+             {% if j.DISPLAYNAME not in ( "Media TLS Internet IPv4 Virtual Server", "Media TLS Internet IPv6 Virtual Server" ) %}
+             {% if i.aliasip == j.ALIASIP|trim %}
+             {% if vs_name.clusterid == 1 %}
+               {"context":"F5_VS_IPADDRINFO","action":"F5_VS_IPADDRINFO_UPDATE", "object": {"dgId": "{{pri_f5_dgid}}"}, "actionObject":[{"IPADDRESS_VERSION": 1, "IPADDRESS": "{{ i.snatip }}", "F5_PTTSERVERID": "{{pri_f5_pttserverid}}", "F5_VIRTUALSERVERID": {{j.F5_VIRTUALSERVERID|trim}} }]},
+               {% endif %}
+               {% endif %}
+               {% endif %}
+               {% endfor %}
+               {% endfor %}
+               {% endfor %}
+               {% endfor %}
+               ]}
+    
+    - name: Add pri media snat servers to gui
+      uri:
+         url: "http://{{ cmsurl }}/cms/networkmap?v=1620732259069"
+         method: POST
+         headers:
+           Connection: 'keep-alive'
+           Authorization: 'Bearer {{ cms_login_token }} '
+           Accept: 'application/json, text/plain, */*'
+         validate_certs: no
+         timeout: 420
+         body: '{{item}}'
+         body_format: json
+      register: pri_snat
+      with_items: "{{snat_pri|to_json|from_json|json_query('ip_snat')}}"
+      failed_when: pri_snat.json.code | int not in [200, 201]
+    
+    ############################################################### GEO Media SNAT configuration ##########################################
+    
+    - name: Filter geo media snat list
+      set_fact:
+        doc2: "{{ virtual_server_list_geo |to_json| from_json | json_query('json.data.childNodes[2].childNodes[].childNodes[].{action_obj: {cardname: dataJson.MEDIACARDNAME, pttid: dataJson.MEDIACARD_PTTSERVERID}, json_value: childNodes[].childNodes[].childNodes[].dataJson.{DISPLAYNAME: DISPLAYNAME, APPSERVER_VS_ID: APPSERVER_VS_ID, APPSERVER_PTTSERVERID: APPSERVER_PTTSERVERID, VIRTUALSERVERTYPE: VIRTUALSERVERTYPE, VIRTUALSERVEREXTIP_VERSION: VIRTUALSERVEREXTIP_VERSION, F5_VIRTUALSERVERID: F5_VIRTUALSERVERID, SIGNALINGCARD_NAME: SIGNALINGCARD_NAME, MEDIACARDNAME: MEDIACARDNAME, ALIAS_IP_PARENT_TYPE: ALIAS_IP_PARENT_TYPE, ALIASIP: ALIASIP }}') }}"
+    - set_fact:
+        media_details: "{{doc2 |to_json| from_json | json_query('[?json_value != null]')}}"
+    
+    - name: Configure geo media snat
+      set_fact:
+        snat_geo: >
+           {"ip_snat":[
+             {% for item in media_details %}
+             {% for vs_name in media_vs %}
+             {% for j in item.json_value %}
+             {% for i in vs_name.virtual_servers if i.name == j.DISPLAYNAME %}
+             {% if j.DISPLAYNAME not in ( "Media TLS Internet IPv4 Virtual Server", "Media TLS Internet IPv6 Virtual Server" ) %}
+             {% if i.aliasip == j.ALIASIP|trim %}
+             {% if vs_name.clusterid == 2 %}
+               {"context":"F5_VS_IPADDRINFO","action":"F5_VS_IPADDRINFO_UPDATE", "object": {"dgId": "{{geo_f5_dgid}}"}, "actionObject":[{"IPADDRESS_VERSION": 1, "IPADDRESS": "{{ i.snatip }}", "F5_PTTSERVERID": "{{geo_f5_pttserverid}}", "F5_VIRTUALSERVERID": {{j.F5_VIRTUALSERVERID|trim}} }]},
+               {% endif %}
+               {% endif %}
+               {% endif %}
+               {% endfor %}
+               {% endfor %}
+               {% endfor %}
+               {% endfor %}
+               ]}
+    
+    - name: Add geo media snat servers to gui
+      uri:
+         url: "http://{{ cmsurl }}/cms/networkmap?v=1620732259069"
+         method: POST
+         headers:
+           Connection: 'keep-alive'
+           Authorization: 'Bearer {{ cms_login_token }} '
+           Accept: 'application/json, text/plain, */*'
+         validate_certs: no
+         timeout: 420
+         body: '{{item}}'
+         body_format: json
+      register: geo_snat
+      with_items: "{{snat_geo|to_json|from_json|json_query('ip_snat')}}"
+      failed_when: geo_snat.json.code | int not in [200, 201]
