@@ -5,163 +5,158 @@
   gather_facts: false
 
   tasks:
-    - block:
-        - name: Get networkmap
-          no_log: true
-          uri:
-            url: "http://{{cmsurl}}/cms/networkmap?v=1633605424448"
-            method: POST
-            headers:
-              Connection: 'keep-alive'
-              Authorization: 'Bearer {{ cms_login_token }} '
-              Accept: 'application/json, text/plain, */*'
-            validate_certs: no
-            body: {"context":"networkmap","action":"networkmap"}
-            body_format: json
-          register: get_networkmap
-          failed_when: get_networkmap.status not in [200, 201]
-        
-        
-        - name: Fetching DGID of F5
-          set_fact:
-            geo_f5_dgid: >-
-                {% for server in get_networkmap.json.dgInfo %}{% if server.CARDTYPE == 101 and server.cardDetails[0].CLUSTERID == '2'%}{{server.DGID}}{% endif %}{% endfor %}
-            pri_f5_dgid: >-
-                {% for server in get_networkmap.json.dgInfo %}{% if server.CARDTYPE == 101 and server.cardDetails[0].CLUSTERID == '1'%}{{server.DGID}}{% endif %}{% endfor %}
-        
-        - name: Fetching F5 PTTSERVERIDs
-          set_fact:
-            geo_f5_pttserverid: >-
-                {% for server in get_networkmap.json.dgInfo %}{% if server.CARDTYPE == 101 and server.cardDetails[0].CLUSTERID == '2'%}{{server.cardDetails[0].PTTSERVERID}}{% endif %}{% endfor %}
-            pri_f5_pttserverid: >-
-                {% for server in get_networkmap.json.dgInfo %}{% if server.CARDTYPE == 101 and server.cardDetails[0].CLUSTERID == '1'%}{{server.cardDetails[0].PTTSERVERID}}{% endif %}{% endfor %}
-        
-        - name: Get the list of primary Global virtual servers
-          no_log: true
-          uri:
-             url: "http://{{ cmsurl }}/cms/networkmap?v=1620732259069"
-             method: POST
-             headers:
-               Connection: 'keep-alive'
-               Authorization: 'Bearer {{ cms_login_token }} '
-               Accept: 'application/json, text/plain, */*'
-             validate_certs: no
-             body: '{"context":"CONFIGURED_VIRTUAL_SERVER","action":"CONFIGURED_VIRTUAL_SERVER_GETALL","object":{"dgId":"{{pri_f5_dgid}}"}}'
-             body_format: json
-          register: virtual_server_list
-          failed_when: virtual_server_list.status not in [200, 201]
-        
-        - name: Filter pri vs list (Global)
-          set_fact:
-            doc1: "{{ virtual_server_list |to_json| from_json | json_query('json.data.childNodes[0].childNodes[].dataJson') }}"
-        
-        - name: Get the list of geo global virtual servers
-          no_log: true
-          uri:
-             url: "http://{{ cmsurl }}/cms/networkmap?v=1620732259069"
-             method: POST
-             headers:
-               Connection: 'keep-alive'
-               Authorization: 'Bearer {{ cms_login_token }} '
-               Accept: 'application/json, text/plain, */*'
-             validate_certs: no
-             body: '{"context":"CONFIGURED_VIRTUAL_SERVER","action":"CONFIGURED_VIRTUAL_SERVER_GETALL","object":{"dgId":"{{geo_f5_dgid}}"}}'
-             body_format: json
-          register: virtual_server_list_geo
-          failed_when: virtual_server_list_geo.status not in [200, 201]
-        
-        - name: Filter geo vs list global
-          set_fact:
-            doc2: "{{ virtual_server_list_geo |to_json| from_json | json_query('json.data.childNodes[0].childNodes[].dataJson') }}"
-        
-        ############################################################### Media VS configuration ##########################################
-        
-        - name: Filter pri media vs list
-          set_fact:
-            doc1: "{{ virtual_server_list |to_json| from_json | json_query('json.data.childNodes[2].childNodes[].childNodes[].{action_obj: {cardname: dataJson.MEDIACARDNAME, pttid: dataJson.MEDIACARD_PTTSERVERID}, json_value: childNodes[].childNodes[].childNodes[].dataJson.{DISPLAYNAME: DISPLAYNAME, APPSERVER_VS_ID: APPSERVER_VS_ID, APPSERVER_PTTSERVERID: APPSERVER_PTTSERVERID, VIRTUALSERVERTYPE: VIRTUALSERVERTYPE, VIRTUALSERVEREXTIP_VERSION: VIRTUALSERVEREXTIP_VERSION, F5_VIRTUALSERVERID: F5_VIRTUALSERVERID, SIGNALINGCARD_NAME: SIGNALINGCARD_NAME, MEDIACARDNAME: MEDIACARDNAME, ALIAS_IP_PARENT_TYPE: ALIAS_IP_PARENT_TYPE, ALIASIP: ALIASIP }}') }}"
-        - set_fact:
-            media_details: "{{doc1 |to_json| from_json | json_query('[?json_value != null]')}}"
-        
-        - name: Configure media pri vs
-          set_fact:
-            vs_pri: >
-               {"ip_pri":[
-                 {% for item in media_details %}
-                 {% for vs_name in media_vs %}
-                 {% for j in item.json_value %}
-                 {% for i in vs_name.virtual_servers if i.name == j.DISPLAYNAME %}
-                 {% if i.aliasip == j.ALIASIP|trim %}
-                 {% if vs_name.clusterid == 1 %}
-                   {"context": "CONFIGURED_VS_DETAILS","action": "CONFIGURE_VIRTUAL_SERVER", "object": {"dgId": "{{pri_f5_dgid}}"}, "actionObject": {"DISPLAYNAME": "{{j.DISPLAYNAME}}","APPSERVER_VS_ID": {{j.APPSERVER_VS_ID}},"VIRTUALSERVEREXTERNALIP": "{{i.virtualserverexternalip}}","APPSERVER_PTTSERVERID": "{{j.APPSERVER_PTTSERVERID}}", "STATUS": 0, "VIRTUALSERVERTYPE": {{j.VIRTUALSERVERTYPE}}, "VIRTUALSERVEREXTIP_VERSION": {{j.VIRTUALSERVEREXTIP_VERSION}}, "SIGNALINGCARD_NAME": "{{j.SIGNALINGCARD_NAME}}", "MEDIACARDNAME": "{{j.MEDIACARDNAME}}", "ALIAS_IP_PARENT_TYPE": {{j.ALIAS_IP_PARENT_TYPE}}, "ALIASIP": "{{j.ALIASIP|trim}}" }},
-                   {% endif %}
-                   {% endif %}
-                   {% endfor %}
-                   {% endfor %}
-                   {% endfor %}
-                   {% endfor %}
-                   ]}
-        
-        
-        - name: Add media pri virtual servers to gui
-          uri:
-             url: "http://{{ cmsurl }}/cms/networkmap?v=1620732259069"
-             method: POST
-             headers:
-               Connection: 'keep-alive'
-               Authorization: 'Bearer {{ cms_login_token }} '
-               Accept: 'application/json, text/plain, */*'
-             validate_certs: no
-             timeout: 420
-             body: '{{item}}'
-             body_format: json
-          register: pri_vs
-          with_items: "{{vs_pri|to_json|from_json|json_query('ip_pri')}}"
-          failed_when: pri_vs.json.code | int not in [200, 201]
-        
-        - name: Filter media geo vs list
-          set_fact:
-            doc2: "{{ virtual_server_list_geo |to_json| from_json | json_query('json.data.childNodes[2].childNodes[].childNodes[].{action_obj: {cardname: dataJson.MEDIACARDNAME, pttid: dataJson.MEDIACARD_PTTSERVERID}, json_value: childNodes[].childNodes[].childNodes[].dataJson.{DISPLAYNAME: DISPLAYNAME, APPSERVER_VS_ID: APPSERVER_VS_ID, APPSERVER_PTTSERVERID: APPSERVER_PTTSERVERID, VIRTUALSERVERTYPE: VIRTUALSERVERTYPE, VIRTUALSERVEREXTIP_VERSION: VIRTUALSERVEREXTIP_VERSION, F5_VIRTUALSERVERID: F5_VIRTUALSERVERID, SIGNALINGCARD_NAME: SIGNALINGCARD_NAME, MEDIACARDNAME: MEDIACARDNAME, ALIAS_IP_PARENT_TYPE: ALIAS_IP_PARENT_TYPE, ALIASIP: ALIASIP }}') }}"
-        - set_fact:
-            media_details: "{{doc2 |to_json| from_json | json_query('[?json_value != null]')}}"
-        
-        - name: Configure media geo vs
-          set_fact:
-            vs_geo: >
-               {"ip_geo":[
-                 {% for item in media_details %}
-                 {% for vs_name in media_vs %}
-                 {% for j in item.json_value %}
-                 {% for i in vs_name.virtual_servers if i.name == j.DISPLAYNAME %}
-                 {% if i.aliasip == j.ALIASIP|trim %}
-                 {% if vs_name.clusterid == 2 %}
-                   {"context": "CONFIGURED_VS_DETAILS","action": "CONFIGURE_VIRTUAL_SERVER", "object": {"dgId": "{{geo_f5_dgid}}"}, "actionObject": {"DISPLAYNAME": "{{j.DISPLAYNAME}}","APPSERVER_VS_ID": {{j.APPSERVER_VS_ID}},"VIRTUALSERVEREXTERNALIP": "{{i.virtualserverexternalip}}","APPSERVER_PTTSERVERID": "{{j.APPSERVER_PTTSERVERID}}", "STATUS": 0, "VIRTUALSERVERTYPE": {{j.VIRTUALSERVERTYPE}}, "VIRTUALSERVEREXTIP_VERSION": {{j.VIRTUALSERVEREXTIP_VERSION}}, "SIGNALINGCARD_NAME": "{{j.SIGNALINGCARD_NAME}}", "MEDIACARDNAME": "{{j.MEDIACARDNAME}}", "ALIAS_IP_PARENT_TYPE": {{j.ALIAS_IP_PARENT_TYPE}}, "ALIASIP": "{{j.ALIASIP|trim}}" }},
-                   {% endif %}
-                   {% endif %}
-                   {% endfor %}
-                   {% endfor %}
-                   {% endfor %}
-                   {% endfor %}
-                   ]}
-        
-        - name: Add geo virtual servers to gui
-          uri:
-             url: "http://{{ cmsurl }}/cms/networkmap?v=1620732259069"
-             method: POST
-             headers:
-               Connection: 'keep-alive'
-               Authorization: 'Bearer {{ cms_login_token }} '
-               Accept: 'application/json, text/plain, */*'
-             validate_certs: no
-             timeout: 420
-             body: '{{item}}'
-             body_format: json
-          register: geo_vs
-          with_items: "{{vs_geo|to_json|from_json|json_query('ip_geo')}}"
-          failed_when: geo_vs.json.code | int not in [200, 201]
-        
-        - name: update the task in status file
-          lineinfile:
-              path: "{{status_file}}"
-              line: "media_vs"
-	  
-      when: "'media_vs' not in status_check_list"
+    - import_role:
+        name: checkjob
+
+    - name: Get networkmap
+      no_log: true
+      uri:
+        url: "http://{{cmsurl}}/cms/networkmap?v=1633605424448"
+        method: POST
+        headers:
+          Connection: 'keep-alive'
+          Authorization: 'Bearer {{ cms_login_token }} '
+          Accept: 'application/json, text/plain, */*'
+        validate_certs: no
+        body: {"context":"networkmap","action":"networkmap"}
+        body_format: json
+      register: get_networkmap
+      failed_when: get_networkmap.status not in [200, 201]
+    
+    
+    - name: Fetching DGID of F5
+      set_fact:
+        geo_f5_dgid: >-
+            {% for server in get_networkmap.json.dgInfo %}{% if server.CARDTYPE == 101 and server.cardDetails[0].CLUSTERID == '2'%}{{server.DGID}}{% endif %}{% endfor %}
+        pri_f5_dgid: >-
+            {% for server in get_networkmap.json.dgInfo %}{% if server.CARDTYPE == 101 and server.cardDetails[0].CLUSTERID == '1'%}{{server.DGID}}{% endif %}{% endfor %}
+    
+    - name: Fetching F5 PTTSERVERIDs
+      set_fact:
+        geo_f5_pttserverid: >-
+            {% for server in get_networkmap.json.dgInfo %}{% if server.CARDTYPE == 101 and server.cardDetails[0].CLUSTERID == '2'%}{{server.cardDetails[0].PTTSERVERID}}{% endif %}{% endfor %}
+        pri_f5_pttserverid: >-
+            {% for server in get_networkmap.json.dgInfo %}{% if server.CARDTYPE == 101 and server.cardDetails[0].CLUSTERID == '1'%}{{server.cardDetails[0].PTTSERVERID}}{% endif %}{% endfor %}
+    
+    - name: Get the list of primary Global virtual servers
+      no_log: true
+      uri:
+         url: "http://{{ cmsurl }}/cms/networkmap?v=1620732259069"
+         method: POST
+         headers:
+           Connection: 'keep-alive'
+           Authorization: 'Bearer {{ cms_login_token }} '
+           Accept: 'application/json, text/plain, */*'
+         validate_certs: no
+         body: '{"context":"CONFIGURED_VIRTUAL_SERVER","action":"CONFIGURED_VIRTUAL_SERVER_GETALL","object":{"dgId":"{{pri_f5_dgid}}"}}'
+         body_format: json
+      register: virtual_server_list
+      failed_when: virtual_server_list.status not in [200, 201]
+    
+    - name: Filter pri vs list (Global)
+      set_fact:
+        doc1: "{{ virtual_server_list |to_json| from_json | json_query('json.data.childNodes[0].childNodes[].dataJson') }}"
+    
+    - name: Get the list of geo global virtual servers
+      no_log: true
+      uri:
+         url: "http://{{ cmsurl }}/cms/networkmap?v=1620732259069"
+         method: POST
+         headers:
+           Connection: 'keep-alive'
+           Authorization: 'Bearer {{ cms_login_token }} '
+           Accept: 'application/json, text/plain, */*'
+         validate_certs: no
+         body: '{"context":"CONFIGURED_VIRTUAL_SERVER","action":"CONFIGURED_VIRTUAL_SERVER_GETALL","object":{"dgId":"{{geo_f5_dgid}}"}}'
+         body_format: json
+      register: virtual_server_list_geo
+      failed_when: virtual_server_list_geo.status not in [200, 201]
+    
+    - name: Filter geo vs list global
+      set_fact:
+        doc2: "{{ virtual_server_list_geo |to_json| from_json | json_query('json.data.childNodes[0].childNodes[].dataJson') }}"
+    
+    ############################################################### Media VS configuration ##########################################
+    
+    - name: Filter pri media vs list
+      set_fact:
+        doc1: "{{ virtual_server_list |to_json| from_json | json_query('json.data.childNodes[2].childNodes[].childNodes[].{action_obj: {cardname: dataJson.MEDIACARDNAME, pttid: dataJson.MEDIACARD_PTTSERVERID}, json_value: childNodes[].childNodes[].childNodes[].dataJson.{DISPLAYNAME: DISPLAYNAME, APPSERVER_VS_ID: APPSERVER_VS_ID, APPSERVER_PTTSERVERID: APPSERVER_PTTSERVERID, VIRTUALSERVERTYPE: VIRTUALSERVERTYPE, VIRTUALSERVEREXTIP_VERSION: VIRTUALSERVEREXTIP_VERSION, F5_VIRTUALSERVERID: F5_VIRTUALSERVERID, SIGNALINGCARD_NAME: SIGNALINGCARD_NAME, MEDIACARDNAME: MEDIACARDNAME, ALIAS_IP_PARENT_TYPE: ALIAS_IP_PARENT_TYPE, ALIASIP: ALIASIP }}') }}"
+    - set_fact:
+        media_details: "{{doc1 |to_json| from_json | json_query('[?json_value != null]')}}"
+    
+    - name: Configure media pri vs
+      set_fact:
+        vs_pri: >
+           {"ip_pri":[
+             {% for item in media_details %}
+             {% for vs_name in media_vs %}
+             {% for j in item.json_value %}
+             {% for i in vs_name.virtual_servers if i.name == j.DISPLAYNAME %}
+             {% if i.aliasip == j.ALIASIP|trim %}
+             {% if vs_name.clusterid == 1 %}
+               {"context": "CONFIGURED_VS_DETAILS","action": "CONFIGURE_VIRTUAL_SERVER", "object": {"dgId": "{{pri_f5_dgid}}"}, "actionObject": {"DISPLAYNAME": "{{j.DISPLAYNAME}}","APPSERVER_VS_ID": {{j.APPSERVER_VS_ID}},"VIRTUALSERVEREXTERNALIP": "{{i.virtualserverexternalip}}","APPSERVER_PTTSERVERID": "{{j.APPSERVER_PTTSERVERID}}", "STATUS": 0, "VIRTUALSERVERTYPE": {{j.VIRTUALSERVERTYPE}}, "VIRTUALSERVEREXTIP_VERSION": {{j.VIRTUALSERVEREXTIP_VERSION}}, "SIGNALINGCARD_NAME": "{{j.SIGNALINGCARD_NAME}}", "MEDIACARDNAME": "{{j.MEDIACARDNAME}}", "ALIAS_IP_PARENT_TYPE": {{j.ALIAS_IP_PARENT_TYPE}}, "ALIASIP": "{{j.ALIASIP|trim}}" }},
+               {% endif %}
+               {% endif %}
+               {% endfor %}
+               {% endfor %}
+               {% endfor %}
+               {% endfor %}
+               ]}
+    
+    
+    - name: Add media pri virtual servers to gui
+      uri:
+         url: "http://{{ cmsurl }}/cms/networkmap?v=1620732259069"
+         method: POST
+         headers:
+           Connection: 'keep-alive'
+           Authorization: 'Bearer {{ cms_login_token }} '
+           Accept: 'application/json, text/plain, */*'
+         validate_certs: no
+         timeout: 420
+         body: '{{item}}'
+         body_format: json
+      register: pri_vs
+      with_items: "{{vs_pri|to_json|from_json|json_query('ip_pri')}}"
+      failed_when: pri_vs.json.code | int not in [200, 201]
+    
+    - name: Filter media geo vs list
+      set_fact:
+        doc2: "{{ virtual_server_list_geo |to_json| from_json | json_query('json.data.childNodes[2].childNodes[].childNodes[].{action_obj: {cardname: dataJson.MEDIACARDNAME, pttid: dataJson.MEDIACARD_PTTSERVERID}, json_value: childNodes[].childNodes[].childNodes[].dataJson.{DISPLAYNAME: DISPLAYNAME, APPSERVER_VS_ID: APPSERVER_VS_ID, APPSERVER_PTTSERVERID: APPSERVER_PTTSERVERID, VIRTUALSERVERTYPE: VIRTUALSERVERTYPE, VIRTUALSERVEREXTIP_VERSION: VIRTUALSERVEREXTIP_VERSION, F5_VIRTUALSERVERID: F5_VIRTUALSERVERID, SIGNALINGCARD_NAME: SIGNALINGCARD_NAME, MEDIACARDNAME: MEDIACARDNAME, ALIAS_IP_PARENT_TYPE: ALIAS_IP_PARENT_TYPE, ALIASIP: ALIASIP }}') }}"
+    - set_fact:
+        media_details: "{{doc2 |to_json| from_json | json_query('[?json_value != null]')}}"
+    
+    - name: Configure media geo vs
+      set_fact:
+        vs_geo: >
+           {"ip_geo":[
+             {% for item in media_details %}
+             {% for vs_name in media_vs %}
+             {% for j in item.json_value %}
+             {% for i in vs_name.virtual_servers if i.name == j.DISPLAYNAME %}
+             {% if i.aliasip == j.ALIASIP|trim %}
+             {% if vs_name.clusterid == 2 %}
+               {"context": "CONFIGURED_VS_DETAILS","action": "CONFIGURE_VIRTUAL_SERVER", "object": {"dgId": "{{geo_f5_dgid}}"}, "actionObject": {"DISPLAYNAME": "{{j.DISPLAYNAME}}","APPSERVER_VS_ID": {{j.APPSERVER_VS_ID}},"VIRTUALSERVEREXTERNALIP": "{{i.virtualserverexternalip}}","APPSERVER_PTTSERVERID": "{{j.APPSERVER_PTTSERVERID}}", "STATUS": 0, "VIRTUALSERVERTYPE": {{j.VIRTUALSERVERTYPE}}, "VIRTUALSERVEREXTIP_VERSION": {{j.VIRTUALSERVEREXTIP_VERSION}}, "SIGNALINGCARD_NAME": "{{j.SIGNALINGCARD_NAME}}", "MEDIACARDNAME": "{{j.MEDIACARDNAME}}", "ALIAS_IP_PARENT_TYPE": {{j.ALIAS_IP_PARENT_TYPE}}, "ALIASIP": "{{j.ALIASIP|trim}}" }},
+               {% endif %}
+               {% endif %}
+               {% endfor %}
+               {% endfor %}
+               {% endfor %}
+               {% endfor %}
+               ]}
+    
+    - name: Add geo virtual servers to gui
+      uri:
+         url: "http://{{ cmsurl }}/cms/networkmap?v=1620732259069"
+         method: POST
+         headers:
+           Connection: 'keep-alive'
+           Authorization: 'Bearer {{ cms_login_token }} '
+           Accept: 'application/json, text/plain, */*'
+         validate_certs: no
+         timeout: 420
+         body: '{{item}}'
+         body_format: json
+      register: geo_vs
+      with_items: "{{vs_geo|to_json|from_json|json_query('ip_geo')}}"
+      failed_when: geo_vs.json.code | int not in [200, 201]
