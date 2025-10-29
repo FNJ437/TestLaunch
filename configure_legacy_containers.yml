@@ -6,7 +6,7 @@
 
   tasks:
     - import_role:
-        name: checkjb
+        name: checkjob
 
     - name: Get networkmap details
       include_tasks: get_networkmap_details.yml
