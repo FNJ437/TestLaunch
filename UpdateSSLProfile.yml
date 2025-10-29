@@ -85,7 +85,7 @@
              method: POST
              headers:
                Connection: 'keep-alive'
-               Authorization: 'Bearer {{ result.json.accessToken }} '
+               Authorization: 'Bearer {{ cms_login_token }} '
                Accept: 'application/json, text/plain, */*'
              validate_certs: no
              body: '{"context":"CONFIGURED_VIRTUAL_SERVER","action":"CONFIGURED_VIRTUAL_SERVER_GETALL","object":{"dgId":"{{geo_f5_dgid}}"}}'
@@ -121,7 +121,7 @@
              method: POST
              headers:
                Connection: 'keep-alive'
-               Authorization: 'Bearer {{ result.json.accessToken }} '
+               Authorization: 'Bearer {{ cms_login_token }} '
                Accept: 'application/json, text/plain, */*'
              validate_certs: no
              timeout: 420
@@ -137,7 +137,7 @@
              method: POST
              headers:
                Connection: 'keep-alive'
-               Authorization: 'Bearer {{ result.json.accessToken }} '
+               Authorization: 'Bearer {{ cms_login_token }} '
                Accept: 'application/json, text/plain, */*'
              validate_certs: no
              timeout: 420
@@ -184,7 +184,7 @@
              method: POST
              headers:
                Connection: 'keep-alive'
-               Authorization: 'Bearer {{ result.json.accessToken }} '
+               Authorization: 'Bearer {{ cms_login_token }} '
                Accept: 'application/json, text/plain, */*'
              validate_certs: no
              timeout: 420
@@ -219,7 +219,7 @@
              method: POST
              headers:
                Connection: 'keep-alive'
-               Authorization: 'Bearer {{ result.json.accessToken }} '
+               Authorization: 'Bearer {{ cms_login_token }} '
                Accept: 'application/json, text/plain, */*'
              validate_certs: no
              timeout: 420
@@ -266,7 +266,7 @@
              method: POST
              headers:
                Connection: 'keep-alive'
-               Authorization: 'Bearer {{ result.json.accessToken }} '
+               Authorization: 'Bearer {{ cms_login_token }} '
                Accept: 'application/json, text/plain, */*'
              validate_certs: no
              timeout: 420
@@ -310,7 +310,7 @@
              method: POST
              headers:
                Connection: 'keep-alive'
-               Authorization: 'Bearer {{ result.json.accessToken }} '
+               Authorization: 'Bearer {{ cms_login_token }} '
                Accept: 'application/json, text/plain, */*'
              validate_certs: no
              timeout: 420
@@ -324,5 +324,5 @@
           lineinfile:
               path: "{{status_file}}"
               line: "update_ssl_profile"
-           
+
       when: "'update_ssl_profile' not in status_check_list"
