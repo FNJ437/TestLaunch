@@ -219,5 +219,4 @@
           lineinfile:
               path: "{{status_file}}"
               line: "vs"
-			  
       when: "'vs' not in status_check_list"
