@@ -476,5 +476,4 @@
           lineinfile:
               path: "{{status_file}}"
               line: "snat_pool"
-        			  
       when: "'snat_pool' not in status_check_list"
