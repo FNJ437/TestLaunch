@@ -61,8 +61,3 @@
 
     - debug:
         msg: "{{ create_container }}"
-
-    - name: update the task in status file
-      lineinfile:
-          path: "{{status_file}}"
-          line: "add_legacy_containers"
