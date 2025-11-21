@@ -23,11 +23,11 @@
         status_code: 200
       register: get_clusterinfo
       failed_when: get_clusterinfo.status not in [200, 201]
-    
+
     - set_fact:
         syncgwurl: "{{'https://syncgw'~wildcard~'/ptxdata'}}"
         synclocurl: "{{'https://syncloc'~wildcard~'/ptxdata'}}"
-    
+
     - name: MICROSVC_GLOBAL_CLUSTER_INFO_CONFIG_UPDATE
       uri:
          url: "http://{{ cmsurl }}/cms/networkmap?v=1620732259069"
