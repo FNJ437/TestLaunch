@@ -4,15 +4,33 @@
   become_method: sudo
   gather_facts: false
 
+  vars:
+    # Define 'legacy' and 'clusterid' as needed in your inventory or extra_vars
+
   tasks:
     - import_role:
         name: checkjob
+
+    - name: Filter legacy based on clusterid
+      set_fact:
+        filtered_legacy: >-
+          {{
+            legacy if ((clusterid | default('all')) | lower == 'all')
+            else (
+              legacy
+              | selectattr('clusterid', 'in',
+                  (clusterid if clusterid is iterable and clusterid is not string
+                   else [clusterid | int])
+                )
+              | list
+            )
+          }}
 
     - name: Generate legacy container add API request
       set_fact:
         cont_list: >
           {"context":"MANAGEDOBJECTS_NODE","action":"MANAGEDOBJECTS_NODE_ADD","actionObject":{"dgInfo":[
-            {%- for item in legacy %}
+            {%- for item in filtered_legacy %}
               {% for c in item.containers %}
                 {% if c.sigcardid not in ( '110','38','39','32','33') %}
                   {"cardDetails":[{"SIGNALINGCARD_NAME":"{{ c.name }}","CHASSISID":"{{ item.chassisid }}","IPADDRESS":"{{ c.interface[0].ip }}","CLUSTERID":"{{ item.clusterid }}","HOSTNAME":"{{ c.name }}","NODETYPE":{% if c.sigcardid == "101" or c.sigcardid == "102" %}1{% else %}{{c.nodetype }}{% endif %},{% if (c.sigcardid == "32") and (c.nodetype == 1) %}"MAXSUBSCRIBERSRANGE":"10000"{% endif %}},],"DGID":"{{ c.dgid }}","DGNAME":"{% if c.sigcardid == '101' or c.sigcardid == '102' %}{{ c.name }}{% else %}{{ c.cardtype}}{% endif %}","CARDTYPE":"{{ c.sigcardid }}"},
@@ -21,25 +39,9 @@
             {% endfor -%}
           ]}}
 
-    - name: Generate legacy container add API request
-      set_fact:
-        sec_geo_poc_cont_list: >
-          [
-            {%- for type in [1,2,3] %}
-              {% for item in legacy %}
-                {% for c in item.containers %}
-                  {% if c.sigcardid in( '32', '33' ) and c.nodetype == type %}
-                    {"cardDetails":[{"SIGNALINGCARD_NAME":"{{ c.name }}","CHASSISID":"{{ item.chassisid }}","IPADDRESS":"{{ c.interface[0].ip }}","CLUSTERID":"{{ item.clusterid }}","HOSTNAME":"{{ c.name }}","NODETYPE":{% if c.sigcardid == "101" or c.sigcardid == "102" %}1{% else %}{{c.nodetype }}{% endif %},{% if (c.sigcardid == "32") and (c.nodetype == 1) %}"MAXSUBSCRIBERSRANGE":"10000"{% endif %}},],"DGID":"{{ c.dgid }}","DGNAME":"{% if c.sigcardid == '101' or c.sigcardid == '102' %}{{ c.name }}{% else %}{{ c.cardtype}}{% endif %}","CARDTYPE":"{{ c.sigcardid }}"},
-                  {% endif %}
-                {% endfor %}
-              {% endfor %}
-            {% endfor -%}
-
-          ]
 
     - set_fact:
-        cont_list: "{{ cont_list | combine({'actionObject': {'dgInfo': (cont_list['actionObject']['dgInfo'] + sec_geo_poc_cont_list)}}) }}"
-        #cont_list: "{{cont_list['actionObject']['dgInfo'].extend(sec_geo_poc_cont_list)}}"
+        cont_list: "{{cont_list['actionObject']['dgInfo']}}"
 
     - debug:
         msg: "{{ cont_list }}"
