@@ -10,16 +10,31 @@
 
     - name: Get networkmap_detais
       include_tasks: get_networkmap_details.yml
-    
+
     - set_fact:
         dgInfo: "{{ get_networkmap |json_query('json.dgInfo')|to_json |from_json  }}"
-    
+
+    - name: Filter legacy based on clusterid
+      set_fact:
+        filtered_legacy: >-
+          {{
+            legacy if ((clusterid | default('all')) | lower == 'all')
+            else (
+              legacy
+              | selectattr('clusterid', 'in',
+                  (clusterid if clusterid is iterable and clusterid is not string
+                   else [clusterid | int])
+                )
+              | list
+            )
+          }}
+
     - set_fact:
         media_add: >
           {"medialist":[
             {% for item in dgInfo %}
               {% for c in item.cardDetails %}
-                {% for nw in legacy if c.SIGNALINGCARDTYPE == 32 or c.SIGNALINGCARDTYPE == 33 %}
+                {% for nw in filtered_legacy if c.SIGNALINGCARDTYPE == 32 or c.SIGNALINGCARDTYPE == 33 %}
                   {% for ip in nw.containers if nw.clusterid|string() == c.CLUSTERID|string() and ip.nodetype|int == c.NODETYPE|int %}
                     {% if ip.sigcardid|int == 38 or ip.sigcardid|int == 39 %}
                       {% set jq = "[? DGID == '" + item.DGID + "' ].cardDetails[]|[? NODETYPE==`" + c.NODETYPE|string()  + "`].SIGNALINGCARDID" %}
@@ -56,7 +71,7 @@
               {% endfor %}
             {% endfor %}
           ]}
-    
+
     - name: Add media containers
       uri:
         url: "http://{{ cmsurl }}/cms/config?v=1618385170120"
@@ -72,6 +87,6 @@
       register: get_data_by_nwmap
       with_items: "{{ media_add | json_query('medialist[]') }}"
       failed_when: get_data_by_nwmap.json.code | int not in [200, 201]
-    
+
     - set_fact:
         get_data_by_nwmap: "{{ get_data_by_nwmap |json_query('results[*].{ body: item, json: json}')|to_json |from_json  }}"
