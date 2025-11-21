@@ -8,6 +8,10 @@
     - import_role:
         name: checkjob
 
+    - name: Media VS which requires SSL Profile Name update
+      set_fact:
+        Media_VS_SSL_Profile: ['Media TLS Internet IPv4 Virtual Server','Media DTLS Cellular Internet APN IPv4 Virtual Server']
+
     - name: Get networkmap
       no_log: true
       uri:
@@ -22,11 +26,6 @@
         body_format: json
       register: get_networkmap
       failed_when: get_networkmap.status not in [200, 201]
-
-
-    - name: Media VS which requires SSL Profile Name update
-      set_fact:
-        Media_VS_SSL_Profile: ['Media TLS Internet IPv4 Virtual Server','Media DTLS Cellular Internet APN IPv4 Virtual Server']
 
     - name: Fetching DGID of F5
       set_fact:
@@ -70,15 +69,17 @@
              {% for item in doc1 %}
              {% for vs_name in f5_vs  %}
              {% for i in vs_name.virtual_servers if ( i.name == item.DISPLAYNAME  ) %}
-             {% if i.ssl_profile_name %}
-             {% if vs_name.clusterid == 1 %}
+             {% if i.ssl_profile_name
+                   and vs_name.clusterid == 1
+                   and pri_f5_dgid
+                   and pri_f5_pttserverid
+                   and item.F5_VIRTUALSERVERID != -1 %}
                {"context":"F5_VS_CONFIGVALUES","action":"F5_VS_CONFIGVALUES_UPDATE", "object": {"dgId": "{{pri_f5_dgid}}"}, "actionObject":[{"PARAMNAME": "var_ssl_profile_name", "PARAMVALUE": "{{i.ssl_profile_name}}", "F5_PTTSERVERID": "{{pri_f5_pttserverid}}", "F5_VIRTUALSERVERID": {{item.F5_VIRTUALSERVERID}}, "VIRTUALSERVERTYPE": {{item.VIRTUALSERVERTYPE}} }]},
              {% endif %}
-             {% endif %}
              {% endfor %}
              {% endfor %}
              {% endfor %}
-             ]}
+           ]}
 
     - name: Get the list of geo virtual servers
       no_log: true
@@ -106,16 +107,17 @@
              {% for item in doc2 %}
              {% for vs_name in f5_vs  %}
              {% for i in vs_name.virtual_servers if ( i.name == item.DISPLAYNAME  ) %}
-             {% if i.ssl_profile_name %}
-             {% if vs_name.clusterid == 2 %}
+             {% if i.ssl_profile_name
+                   and vs_name.clusterid == 2
+                   and geo_f5_dgid
+                   and geo_f5_pttserverid
+                   and item.F5_VIRTUALSERVERID != -1 %}
                 {"context":"F5_VS_CONFIGVALUES","action":"F5_VS_CONFIGVALUES_UPDATE", "object": {"dgId": "{{geo_f5_dgid}}"}, "actionObject":[{"PARAMNAME": "var_ssl_profile_name", "PARAMVALUE": "{{i.ssl_profile_name}}", "F5_PTTSERVERID": "{{geo_f5_pttserverid}}", "F5_VIRTUALSERVERID": {{item.F5_VIRTUALSERVERID}}, "VIRTUALSERVERTYPE": {{item.VIRTUALSERVERTYPE}} }]},
              {% endif %}
-             {% endif %}
              {% endfor %}
              {% endfor %}
              {% endfor %}
-             ]}
-
+           ]}
 
     - name: update profile_ssl_name for global vs in primary
       uri:
@@ -149,7 +151,6 @@
       with_items: "{{ssl_geo|to_json|from_json|json_query('ssl_config_geo')}}"
       failed_when: geo_profile.json.code | int not in [200, 201]
 
-
     ################################################# POC VS SSL Profile Name Update #######################################
 
     - name: Filter pri poc vs list
@@ -160,7 +161,6 @@
       set_fact:
         doc2: "{{ virtual_server_list_geo |to_json| from_json | json_query('json.data.childNodes[2].childNodes[].{action_object: {sig_name:dataJson.SIGNALINGCARD_NAME, pttserverid:dataJson.PTTSERVERID}, json_value: childNodes[].dataJson.{DISPLAYNAME: DISPLAYNAME, APPSERVER_VS_ID: APPSERVER_VS_ID, APPSERVER_PTTSERVERID: APPSERVER_PTTSERVERID, VIRTUALSERVERTYPE: VIRTUALSERVERTYPE, VIRTUALSERVEREXTIP_VERSION: VIRTUALSERVEREXTIP_VERSION, F5_VIRTUALSERVERID: F5_VIRTUALSERVERID} }') }}"
 
-
     - name: Create Request Body for POC VS in Primary
       set_fact:
         ssl_poc_pri: >
@@ -169,16 +169,19 @@
              {% for vs_name in f5_vs %}
              {% for j in item.json_value %}
              {% for i in vs_name.virtual_servers if ( i.name == j.DISPLAYNAME  ) %}
-             {% if i.ssl_profile_name %}
-             {% if vs_name.clusterid == 1 and ( i.pocname == item.action_object.sig_name ) %}
+             {% if i.ssl_profile_name
+                   and vs_name.clusterid == 1
+                   and pri_f5_dgid
+                   and pri_f5_pttserverid
+                   and j.F5_VIRTUALSERVERID != -1
+                   and i.pocname == item.action_object.sig_name %}
                 {"context":"F5_VS_CONFIGVALUES","action":"F5_VS_CONFIGVALUES_UPDATE", "object": {"dgId": "{{pri_f5_dgid}}"}, "actionObject":[{"PARAMNAME": "var_ssl_profile_name", "PARAMVALUE": "{{i.ssl_profile_name}}", "F5_PTTSERVERID": "{{pri_f5_pttserverid}}", "F5_VIRTUALSERVERID": {{j.F5_VIRTUALSERVERID}}, "VIRTUALSERVERTYPE": {{j.VIRTUALSERVERTYPE}} }]},
              {% endif %}
-             {% endif %}
              {% endfor %}
              {% endfor %}
              {% endfor %}
              {% endfor %}
-             ]}
+           ]}
 
     - name: update profile_ssl_name for poc vs in primary
       uri:
@@ -204,16 +207,19 @@
              {% for vs_name in f5_vs %}
              {% for j in item.json_value %}
              {% for i in vs_name.virtual_servers if ( i.name == j.DISPLAYNAME  ) %}
-             {% if i.ssl_profile_name %}
-             {% if vs_name.clusterid == 2 and ( i.pocname == item.action_object.sig_name ) %}
+             {% if i.ssl_profile_name
+                   and vs_name.clusterid == 2
+                   and geo_f5_dgid
+                   and geo_f5_pttserverid
+                   and j.F5_VIRTUALSERVERID != -1
+                   and i.pocname == item.action_object.sig_name %}
                {"context":"F5_VS_CONFIGVALUES","action":"F5_VS_CONFIGVALUES_UPDATE", "object": {"dgId": "{{geo_f5_dgid}}"}, "actionObject":[{"PARAMNAME": "var_ssl_profile_name", "PARAMVALUE": "{{i.ssl_profile_name}}", "F5_PTTSERVERID": "{{geo_f5_pttserverid}}", "F5_VIRTUALSERVERID": {{j.F5_VIRTUALSERVERID}}, "VIRTUALSERVERTYPE": {{j.VIRTUALSERVERTYPE}} }]},
              {% endif %}
-             {% endif %}
              {% endfor %}
              {% endfor %}
              {% endfor %}
              {% endfor %}
-             ]}
+           ]}
 
     - name: update profile_ssl_name for poc vs in geo
       uri:
@@ -231,7 +237,6 @@
       with_items: "{{ssl_poc_geo|to_json|from_json|json_query('ssl_config_poc_geo')}}"
       failed_when: geo_ssl.json.code | int not in [200, 201]
 
-
     ################################################Media VS SSL Profile Name Update########################################################
 
     - name: Filter pri media vs list
@@ -239,7 +244,6 @@
         doc1: "{{ virtual_server_list |to_json| from_json | json_query('json.data.childNodes[2].childNodes[].childNodes[].{action_obj: {cardname: dataJson.MEDIACARDNAME, pttid: dataJson.MEDIACARD_PTTSERVERID}, json_value: childNodes[].childNodes[].childNodes[].dataJson.{DISPLAYNAME: DISPLAYNAME, APPSERVER_VS_ID: APPSERVER_VS_ID, APPSERVER_PTTSERVERID: APPSERVER_PTTSERVERID, VIRTUALSERVERTYPE: VIRTUALSERVERTYPE, VIRTUALSERVEREXTIP_VERSION: VIRTUALSERVEREXTIP_VERSION, F5_VIRTUALSERVERID: F5_VIRTUALSERVERID, SIGNALINGCARD_NAME: SIGNALINGCARD_NAME, MEDIACARDNAME: MEDIACARDNAME, ALIAS_IP_PARENT_TYPE: ALIAS_IP_PARENT_TYPE, ALIASIP: ALIASIP }}') }}"
     - set_fact:
         media_details: "{{doc1 |to_json| from_json | json_query('[?json_value != null]')}}"
-
 
     - name: Create Request Body for Media VS in Primary
       set_fact:
@@ -249,18 +253,19 @@
              {% for vs_name in media_vs %}
              {% for j in item.json_value %}
              {% for i in vs_name.virtual_servers if i.name == j.DISPLAYNAME %}
-             {% if i.name in Media_VS_SSL_Profile %}
-             {% if i.aliasip == j.ALIASIP|trim %}
-             {% if vs_name.clusterid == 1 %}
+             {% if i.name in Media_VS_SSL_Profile
+                   and i.aliasip == j.ALIASIP|trim
+                   and vs_name.clusterid == 1
+                   and pri_f5_dgid
+                   and pri_f5_pttserverid
+                   and j.F5_VIRTUALSERVERID|trim != "-1" %}
                {"context":"F5_VS_CONFIGVALUES","action":"F5_VS_CONFIGVALUES_UPDATE", "object": {"dgId": "{{pri_f5_dgid}}"}, "actionObject":[{"PARAMNAME": "var_ssl_profile_name", "PARAMVALUE": "profile_kn_clientssl", "F5_PTTSERVERID": "{{pri_f5_pttserverid}}", "F5_VIRTUALSERVERID": {{j.F5_VIRTUALSERVERID|trim}}, "VIRTUALSERVERTYPE": {{j.VIRTUALSERVERTYPE}} }]},
              {% endif %}
-             {% endif %}
-             {% endif %}
              {% endfor %}
              {% endfor %}
              {% endfor %}
              {% endfor %}
-             ]}
+           ]}
 
     - name: update profile_ssl_name for media vs in pri
       uri:
@@ -278,7 +283,6 @@
       with_items: "{{ssl_media_pri|to_json|from_json|json_query('ssl_media_config_pri')}}"
       failed_when: media_ssl.json.code | int not in [200, 201]
 
-
     - name: Filter geo media vs list
       set_fact:
         doc2: "{{ virtual_server_list_geo |to_json| from_json | json_query('json.data.childNodes[2].childNodes[].childNodes[].{action_obj: {cardname: dataJson.MEDIACARDNAME, pttid: dataJson.MEDIACARD_PTTSERVERID}, json_value: childNodes[].childNodes[].childNodes[].dataJson.{DISPLAYNAME: DISPLAYNAME, APPSERVER_VS_ID: APPSERVER_VS_ID, APPSERVER_PTTSERVERID: APPSERVER_PTTSERVERID, VIRTUALSERVERTYPE: VIRTUALSERVERTYPE, VIRTUALSERVEREXTIP_VERSION: VIRTUALSERVEREXTIP_VERSION, F5_VIRTUALSERVERID: F5_VIRTUALSERVERID, SIGNALINGCARD_NAME: SIGNALINGCARD_NAME, MEDIACARDNAME: MEDIACARDNAME, ALIAS_IP_PARENT_TYPE: ALIAS_IP_PARENT_TYPE, ALIASIP: ALIASIP }}') }}"
@@ -293,18 +297,19 @@
              {% for vs_name in media_vs %}
              {% for j in item.json_value %}
              {% for i in vs_name.virtual_servers if i.name == j.DISPLAYNAME %}
-             {% if i.name in Media_VS_SSL_Profile %}
-             {% if i.aliasip == j.ALIASIP|trim %}
-             {% if vs_name.clusterid == 2 %}
+             {% if i.name in Media_VS_SSL_Profile
+                   and i.aliasip == j.ALIASIP|trim
+                   and vs_name.clusterid == 2
+                   and geo_f5_dgid
+                   and geo_f5_pttserverid
+                   and j.F5_VIRTUALSERVERID|trim != "-1" %}
                {"context":"F5_VS_CONFIGVALUES","action":"F5_VS_CONFIGVALUES_UPDATE", "object": {"dgId": "{{geo_f5_dgid}}"}, "actionObject":[{"PARAMNAME": "var_ssl_profile_name", "PARAMVALUE": "profile_kn_clientssl", "F5_PTTSERVERID": "{{geo_f5_pttserverid}}", "F5_VIRTUALSERVERID": {{j.F5_VIRTUALSERVERID|trim}}, "VIRTUALSERVERTYPE": {{j.VIRTUALSERVERTYPE}} }]},
              {% endif %}
-             {% endif %}
-             {% endif %}
              {% endfor %}
              {% endfor %}
              {% endfor %}
              {% endfor %}
-             ]}
+           ]}
 
     - name: update profile_ssl_name for media vs in geo
       uri:
